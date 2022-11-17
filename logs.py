@@ -5,20 +5,31 @@ Logging module
 
 import logging
 import sys
+from pathlib import PurePath
+import os
 
-def setup(file=''):
+def setup(path='logs/latest.txt'):
     '''
     Logging setup
     Настройка логирования
     '''
-    if file != '':
-        logging.basicConfig(filename=file,
+    # Logs path was passed as argument
+    if path != '':
+        logging.basicConfig(filename=path,
                             filemode='a',
                             format='%(asctime)s,%(msecs)d,%(name)s,%(levelname)s,%(message)s',
                             datefmt='%H:%M:%S',
                             level=logging.INFO)
+    # Running in shell with output interface
     elif sys.stdout.isatty():
         logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                            datefmt='%H:%M:%S',
+                            level=logging.INFO)
+    # Default behaviour
+    else:
+        logging.basicConfig(filename=str(PurePath(__file__).with_name('logs/latest.txt')),
+                            filemode='a',
+                            format='%(asctime)s,%(msecs)d,%(name)s,%(levelname)s,%(message)s',
                             datefmt='%H:%M:%S',
                             level=logging.INFO)
 

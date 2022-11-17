@@ -3,7 +3,7 @@ Module for User class
 Модуль для класса User
 '''
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

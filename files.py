@@ -4,11 +4,11 @@ File operation module
 '''
 
 import sqlite3
-#import openpyxl as xl
 
 from docx import Document
 
 import logs
+
 
 def find_user(telegram_id):
     '''
@@ -18,14 +18,16 @@ def find_user(telegram_id):
     try:
         with sqlite3.connect('data') as connection:
             cursor = connection.cursor()
-            select_query =   "SELECT DISTINCT\n"
-            select_query +=  "\tname,\n"
-            select_query +=  "\tfull_name,\n"
-            select_query +=  "\treplacer,\n"
-            select_query +=  "\tdispatcher,\n"
-            select_query +=  "\tscheduler\n"
-            select_query +=  "FROM staff\n"
-            select_query += f"WHERE telegram_id = '{telegram_id}';\n"
+            select_query = f"""
+            SELECT DISTINCT
+              name,
+              full_name,
+              replacer,
+              dispatcher,
+              scheduler
+            FROM staff
+            WHERE telegram_id = '{telegram_id}';
+            """.strip().replace('            ', '')
             cursor.execute(select_query)
             row = cursor.fetchall()
         if len(row) < 1:
@@ -34,18 +36,6 @@ def find_user(telegram_id):
         return row[0]
     except sqlite3.Error as error:
         logs.message(f'Error occured while searching for user {telegram_id}: {error}')
-
-# TODO: Timetables updates (Обновления расписаний)
-# def database_update(file):
-#     try:
-#         with sqlite3.connect('data/timetables') as connection:
-#             wb = xl.load_workbook(file)
-#             sheet = wb.active
-#             cursor = connection.cursor()
-#            
-#         return 0
-#     except sqlite3.Error as error:
-#         return -1
 
 def save_replacements_from_docx(file):
     '''
@@ -61,33 +51,40 @@ def save_replacements_from_docx(file):
     replaced_teachers.pop(0)
 
     data = []
-    for i in range(min(len(replaced_teachers), len(document.tables))):
-        table = document.tables[i]
+    for j in range(min(len(replaced_teachers), len(document.tables))):
+        table = document.tables[j]
         d = []
         k = []
-        r_d = []
-        for col, row in enumerate(table.rows):
-            text = (cell.text for cell in row.cells)
+        r = []
+        for col, table in enumerate(table.rows):
+            text = (cell.text for cell in table.cells)
             if col == 0:
                 k = tuple(text)
                 continue
-            r_d = dict(zip(k, text))
-            d.append(r_d)
+            r = dict(zip(k, text))
+            d.append(r)
         data.append(d)
 
-    data = []
+    db_data = []
     keys = [ 'Класс', 'Заменяющий учитель', '№ урока', 'Кабинет' ]
-    for i, row in enumerate(data):
-        for r in row:
+    for i, table in enumerate(data):
+        for _, row in enumerate(table):
+            if not isinstance(row, dict):
+                continue
             d = []
-            for k in keys:
-                v = r[k]
+            for j, k in enumerate(keys):
+                v = row[k]
+                if not (j <= 1 or (j > 1 and (v.isdigit() or v == ''))):
+                    d = None
+                    break
                 if v == '' or v.isspace():
                     d.append('NULL')
                     continue
                 d.append(v)
-            data.append(d)
-    return save_replacement(data)
+            if d is not None:
+                d.append(replaced_teachers[i])
+                db_data.append(d)
+    return save_replacement(db_data)
 
 def save_replacement(data):
     '''
@@ -97,18 +94,30 @@ def save_replacement(data):
     try:
         with sqlite3.connect('data') as connection:
             cursor = connection.cursor()
-            create_query =  "CREATE TABLE IF NOT EXISTS replacements (\n"
-            create_query += "\tid INTEGER PRIMARY KEY,\n"
-            create_query += "\tClass TEXT NOT NULL,\n"
-            create_query += "\tTeacher TEXT NOT NULL,\n"
-            create_query += "\tLesson INTEGER NOT NULL,\n"
-            create_query += "\tRoom TEXT\n);"
+            create_query = """
+            CREATE TABLE IF NOT EXISTS replacements (
+              id INTEGER PRIMARY KEY,
+              Class TEXT NOT NULL,
+              Teacher TEXT NOT NULL,
+              Lesson INTEGER NOT NULL,
+              Room TEXT,
+              replaced_teacher TEXT NOT NULL);
+            """.strip().replace('            ', '')
             cursor.execute(create_query)
             cursor.fetchall()
-            insert_query =       "INSERT INTO replacements (Class,Teacher,Lesson,Room)\n\t"
 
+            delete_query = "DELETE FROM replacements"
+            cursor.execute(delete_query)
+
+            insert_query =       "INSERT INTO replacements (Class,Teacher,Lesson,Room,replaced_teacher)"
+            insert_query +=      "\n\tVALUES"
             for d in data:
-                insert_query += f"VALUES ('{d[0]}','{d[1]}',{d[2]},'{d[3]}');"
+                c, t, l, rt = d[0], d[1], d[2], d[4]
+                r = d[3]
+                if r == 'NULL':
+                    r = f"'{r}'"
+                insert_query += f"\n\t('{c}', '{t}', {l}, {r}, '{rt}'),"
+            insert_query = insert_query.strip()[:-1] + ";"
             cursor.execute(insert_query)
             rows = cursor.fetchall()
             cursor.close()
@@ -125,13 +134,15 @@ def read_replacements(teacher):
     try:
         with sqlite3.connect('data') as connection:
             cursor = connection.cursor()
-            select_query =   "SELECT\n"
-            select_query +=  "\tClass,\n"
-            select_query +=  "\tLesson,\n"
-            select_query +=  "\tRoom\n"
-            select_query +=  "FROM replacements\n"
-            select_query += f"WHERE Teacher = '{teacher}'\n"
-            select_query +=  "ORDER BY Lesson;"
+            select_query = f"""
+            SELECT
+              Class,
+              Lesson,
+              Room
+            FROM replacements\n
+            WHERE Teacher = '{teacher}'
+            ORDER BY Lesson;
+            """.strip().replace('            ', '')
             cursor.execute(select_query)
             rows = cursor.fetchall()
             logs.message(rows)
