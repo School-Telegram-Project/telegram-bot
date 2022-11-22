@@ -10,37 +10,92 @@ from docx import Document
 import logs
 
 
-def find_user(telegram_id):
+def int_phone(phone_num: str) -> int:
     '''
-    Finds user in database by Telegram ID
-    Находит пользователя в базе данных по ID Telegram'а
+    Turns phone number string into number
+    Переводит строковый номер телефона в число
+    '''
+    phone_num = phone_num.strip().replace(' ', '')
+    if phone_num.count('+') > 0:
+        phone_num = str(int(phone_num[1]) + 1) + phone_num[2:]
+    return int(phone_num)
+
+def find_user(telegram_id: int, phone_num = '') -> list:
+    '''
+    Finds user in database by phone number or Telegram ID
+    Находит пользователя в базе данных по номеру телефона или ID Telegram'а
+    Output format | Формат данных:
+    Telegram ID; Name; Full name; Replacer (1=y/0=n); Dispatcher (1=y/0=n)
+    Telegram ID; Имя; Полное имя; Заменяющий (1=д/0=н); Диспетчер (1=д/0=н)
     '''
     try:
         with sqlite3.connect('data') as connection:
             cursor = connection.cursor()
-            select_query = f"""
-            SELECT DISTINCT
-              name,
-              full_name,
-              replacer,
-              dispatcher,
-              scheduler
-            FROM staff
-            WHERE telegram_id = '{telegram_id}';
-            """.strip().replace('            ', '')
-            cursor.execute(select_query)
+
+            # Find user by ID
+            # Найти пользователя по ID
+
+            query = (
+                 'SELECT DISTINCT id\n'
+                 'FROM staff\n'
+                f'WHERE telegram_id = {telegram_id};'
+            )
+            cursor.execute(query)
             row = cursor.fetchall()
-        if len(row) < 1:
-            logs.message(f'User {telegram_id} was not found')
-            return None
-        return row[0]
+            if row:
+                query = (
+                     'SELECT DISTINCT\n'
+                     '\tname,\n'
+                     '\tfull_name,\n'
+                     '\treplacer,\n'
+                     '\tdispatcher,\n'
+                    #  '\tscheduler\n'
+                     'FROM staff\n'
+                    f'WHERE id = {row[0][0]};'
+                )
+                cursor.execute(query)
+                return [ telegram_id, *cursor.fetchall()[0] ]
+
+            # Find user by phone
+            # Найти пользователя по номеру телефона
+            if phone_num == '':
+                return None
+
+            phone_num = int_phone(phone_num)
+            query = (
+                 'SELECT DISTINCT\n'
+                 '\ttelegram_id,\n'
+                 '\tname,\n'
+                 '\tfull_name,\n'
+                 '\treplacer,\n'
+                 '\tdispatcher\n'
+                #  '\tscheduler\n'
+                 'FROM staff\n'
+                f'WHERE phone_num = {phone_num};'
+            )
+            cursor.execute(query)
+            row = cursor.fetchall()
+            if not row:
+                return None
+            if row[0][0] == 'NULL':
+                query = (
+                     'UPDATE staff\n'
+                    f'SET telegram_id = {telegram_id}'
+                    f'WHERE phone_num = {phone_num};'
+                )
+                cursor.execute(query)
+                cursor.fetchall()
+                return [ telegram_id, *row[0][1:] ]
+            return row[0]
     except sqlite3.Error as error:
         logs.message(f'Error occured while searching for user {telegram_id}: {error}')
 
-def save_replacements_from_docx(file):
+def save_replacements_from_docx(file: str) -> int:
     '''
     Extracts data tables from docx document
+    Returns amount of affected rows
     Извлекает таблицы из документа docx
+    Возвращает количество изменённых строк
     '''
     document = Document(file)
     replaced_teachers = []
@@ -86,10 +141,12 @@ def save_replacements_from_docx(file):
                 db_data.append(d)
     return save_replacement(db_data)
 
-def save_replacement(data):
+def save_replacement(data: list) -> int:
     '''
     Save replacements data to database
+    Returns amount of affected rows
     Сохранение замен в базе данных
+    Возвращает количество изменённых строк
     '''
     try:
         with sqlite3.connect('data') as connection:
@@ -126,7 +183,7 @@ def save_replacement(data):
         logs.message(f'Can not save data to database: {error}', 2)
         return -1
 
-def read_replacements(teacher):
+def read_replacements(teacher: str) -> list:
     '''
     Reads data from replacements
     Чтение данных из базы замен
