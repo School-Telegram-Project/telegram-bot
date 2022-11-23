@@ -13,6 +13,7 @@ from pathlib import Path
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import (CallbackContext, CommandHandler, Filters,
                           MessageHandler, Updater)
+from telegram.constants import PARSEMODE_HTML as HTML
 
 from main import begin as main_begin, UPDATER as main_updater
 
@@ -21,6 +22,18 @@ users = []
 # 0 = Не запущен, 1 = Остановлен, 2 = Работает
 state = 0
 
+def keyboard(self) -> list:
+    '''
+    Generate main keyboard
+    Создать основную клавиатуру
+    '''
+    keyboard = [
+        [f'{"Выключить бота" if self.state < 2 else "Запустить бота"}'],
+        ['Скачать последний лог-файл'],
+        ['Добавить нового пользователя', 'Удалить пользователя']
+    ]
+
+@functools.lru_cache(maxsize=8)
 def auth(user_id: int):
     '''
     User authentication
@@ -48,13 +61,6 @@ def start(update: Update, context: CallbackContext):
         return
     if tg_id not in users:
         users.append(tg_id)
-    # Запустить бота  |  Выключить бота
-    # Скачать последний лог-файл
-    if state:
-        keyboard = [['Выключить бота']]
-    else:
-        keyboard = [['Запустить бота']]
-    keyboard.append(['Скачать последний лог-файл'])
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     update.message.reply_text('Действие:', reply_markup=reply_markup)
 
@@ -72,6 +78,7 @@ def enable(update: Update, context: CallbackContext):
         return
     if state < 1:
         main_updater = main_begin()
+        main_updater.dispatcher.add_error_handler(error_handler)
     else:
         main_updater.start_polling()
     state = 2
@@ -129,12 +136,37 @@ def download(update: Update, context: CallbackContext):
     with file_path.open(encoding='UTF-8') as file:
         context.bot.send_document(chat_id = update.effective_chat.id, document=file)
 
+def add_user(update: Update, context: CallbackContext):
+    '''
+    Add new user to main bot
+    Добавить нового пользователя через бота
+    '''
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb_string = "".join(tb_list)
+    update_str = update.to_dict() if isinstance(update, Update) else str(update)
+    message = (
+         "Возникла ошибка при работе основного бота\n"
+        f"<pre>Событие: {html.escape(json.dumps(update_str, indent=2, ensure_ascii=False))}"
+         "</pre>\n\n"
+        f"<pre>Данные чата: {html.escape(str(context.chat_data))}</pre>\n\n"
+        f"<pre>Данные пользователя: {html.escape(str(context.user_data))}</pre>\n\n"
+        f"<pre>{html.escape(tb_string)}</pre>"
+    )
+    for user_id in users:
+        context.bot.send_message(text=message,chat_id=user_id,parse_mode=HTML)
+
 def unknown(update: Update, context: CallbackContext):
     '''
     Unknown/wrong command
     Неизвестная/ошибочная команда
     '''
-    context.bot.send_message(chat_id=update.effective_chat.id, text='Неизвестная команда')
+    context.bot.send_message(text='Неизвестная команда', chat_id=update.effective_chat.id)
+
+def error_handler(update: Update, context: CallbackContext) -> None:
+    '''
+    Error handler that redirects errors from main bot to RC users
+    Обработчик ошибок, который пересылает ошибки с основного бота пользователям удалённого управления
+    '''
 
 def begin():
     '''

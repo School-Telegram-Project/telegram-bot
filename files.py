@@ -8,7 +8,7 @@ import sqlite3
 from docx import Document
 
 import logs
-
+from user import User
 
 def int_phone(phone_num: str) -> int:
     '''
@@ -20,13 +20,10 @@ def int_phone(phone_num: str) -> int:
         phone_num = str(int(phone_num[1]) + 1) + phone_num[2:]
     return int(phone_num)
 
-def find_user(telegram_id: int, phone_num = '') -> list:
+def find_user(telegram_id: int, phone_num = '') -> User:
     '''
     Finds user in database by phone number or Telegram ID
     Находит пользователя в базе данных по номеру телефона или ID Telegram'а
-    Output format | Формат данных:
-    Telegram ID; Name; Full name; Replacer (1=y/0=n); Dispatcher (1=y/0=n)
-    Telegram ID; Имя; Полное имя; Заменяющий (1=д/0=н); Диспетчер (1=д/0=н)
     '''
     try:
         with sqlite3.connect('data') as connection:
@@ -54,7 +51,8 @@ def find_user(telegram_id: int, phone_num = '') -> list:
                     f'WHERE id = {row[0][0]};'
                 )
                 cursor.execute(query)
-                return [ telegram_id, *cursor.fetchall()[0] ]
+                data = [ telegram_id, *cursor.fetchall()[0] ]
+                return User(data)
 
             # Find user by phone
             # Найти пользователя по номеру телефона
@@ -85,10 +83,38 @@ def find_user(telegram_id: int, phone_num = '') -> list:
                 )
                 cursor.execute(query)
                 cursor.fetchall()
-                return [ telegram_id, *row[0][1:] ]
-            return row[0]
-    except sqlite3.Error as error:
-        logs.message(f'Error occured while searching for user {telegram_id}: {error}')
+                data = [ telegram_id, *row[0][1:] ]
+            else:
+                data = row[0]
+            return User(data)
+    except sqlite3.Error as sql_error:
+        logs.message(f'Error occured while searching for user {telegram_id}: {sql_error}')
+
+def add_user(data: tuple) -> int:
+    '''
+    Adds new user to table in database
+    Returns success (1 = added, 0 = already in DB, -1 = error)
+    Добавляет нового пользователя в таблицу в базе данных
+    Возвращает результат (1 = добавлен, 0 = уже в базе, -1 = ошибка)
+    '''
+    if len(data) < 7:
+        return -1
+    try:
+        with sqlite3.connect('data') as connection:
+            cursor = connection.cursor()
+            query = (
+                 'INSERT OR IGNORE INTO staff '
+                 '(phone_num, telegram_id, name, full_name, replacer, scheduler, dispatcher)\n'
+                 'VALUES\n'
+                # f'\t({",".join([str(value) for value in data])});'
+                f'\t({",".join([str(value) for value in data]) + ",0"});'
+            )
+            cursor.execute(query)
+            row = cursor.fetchall()
+            return bool(row)
+    except sqlite3.Error as sql_error:
+        logs.message(f'Error occured while adding user to database: {sql_error}')
+        return -1
 
 def save_replacements_from_docx(file: str) -> int:
     '''

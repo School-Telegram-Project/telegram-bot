@@ -43,27 +43,47 @@ def auth(user_id: int) -> User: #, update: Update):
             user = listed_user
     return user
 
-def new_user():
+def new_user(data: tuple) -> int:
     '''
     Add new user
+    Returns success (1 = added, 0 = already in DB, -1 = error)
     Добавить нового пользователя
+    Возвращает результат (1 = добавлен, 0 = уже в базе, -1 = ошибка)
     '''
+    if len(data) < 7:
+        return -1
+    try:
+        user = User(data[1:])
+    except ValueError as error:
+        logs.message(f'Could not add new user {data[0]}: {error}')
+        return -1
+    result = add_user(data)
+    if result:
+        text = f'User {data[0]} was added to database'
+        users.append(user)
+    elif result == 0:
+        text = f'Tried to add user {data[0]} (id={data[1]}), who is already in database'
+    else:
+        text = f'Error happend when trying to add new user {data[0]}'
+    logs.message(text, level=1)
+    return result
 
-def start(update: Update, context: CallbackContext) -> None:
+def start(update: Update, context: CallbackContext, user = None) -> None:
     '''
     Start command
     Команда старта
     '''
     # _ = get_translator(update.effective_user.language_code)
     _ = str
-    user = auth(update.effective_user.id)
-    logs.message(f'User {update.effective_user.id} sended /start')
+    if user is None:
+        user = auth(update.effective_user.id)
+        logs.message(f'User {update.effective_user.id} sended /start')
     if user is None:
         logs.message(f'User {update.effective_chat.id} is not active user')
-        data = files.find_user(update.effective_chat.id)
-        if data is not None:
+        user = files.find_user(update.effective_chat.id)
+        if user is not None:
             logs.message(f'User {update.effective_chat.id} was found by ID')
-            users.append(User(data))
+            users.append(user)
         else:
             keyboard = [ [KeyboardButton('Отправить номер', request_contact=True)] ]
             reply_markup = ReplyKeyboardMarkup(keyboard,
@@ -106,15 +126,15 @@ def contact(update: Update, context: CallbackContext) -> None:
                                  chat_id=update.effective_chat.id,
                                  parse_mode=HTML)
         return
-    data = files.find_user(ct.user_id, ct.phone_number)
-    if data is None:
+    user = files.find_user(ct.user_id, ct.phone_number)
+    if user is None:
         logs.message(f'User {update.effective_user.id} was not found')
         # TODO: Сообщение
         context.bot.send_message(chat_id=update.effective_chat.id, text='нет в базе')
         return
     logs.message(f'User {update.effective_user.id} was found by phone number')
-    users.append(User(data))
-    start(update, context)
+    users.append(user)
+    start(update, context, user)
 
 def view_replacements(update: Update, context: CallbackContext) -> None:
     '''
@@ -132,7 +152,7 @@ def view_replacements(update: Update, context: CallbackContext) -> None:
         text = _('Не удалось прочитать базу данных.')
         context.bot.send_message(chat_id = update.effective_chat.id, text=text)
         return
-    if not replacements: # length = 0
+    if not replacements: # len(replacements) == 0
         text = _('Замены на сегодня не найдены.')
         context.bot.send_message(text=text, chat_id=update.effective_chat.id)
         return

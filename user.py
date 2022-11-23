@@ -23,6 +23,9 @@ class User:
     state: int = 0
 
     def __init__(self, args: tuple):
+        # if len(args) < 6:
+        if len(args) < 5:
+            raise ValueError()
         self.id = args[0]
         self.name = args[1]
         if isinstance(args[2], str):
