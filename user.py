@@ -38,17 +38,21 @@ class User:
     def __str__(self):
         return str(self.id)
 
+    def _keyboard(self) -> list:
+        kb = []
+        if self.replacer:
+            kb.append([VIEW_REPLACEMENTS])
+        if self.dispatcher:
+            # kb.append(['Добавить замены вручную', 'Загрузить файл замен'])
+            kb.append([UPLOAD_REPLACEMENTS_FILE])
+        # if self.scheduler:
+        #     kb.append(['Обновить расписание'])
+        return kb
+
+    @property
     def keyboard(self) -> list:
         '''
         Create Telegram keyboard markup based on user's privileges
         Создать набор клавиш на основе привелегий пользователя
         '''
-        keyboard = []
-        if self.replacer:
-            keyboard.append([VIEW_REPLACEMENTS])
-        if self.dispatcher:
-            # keyboard.append(['Добавить замены вручную', 'Загрузить файл замен'])
-            keyboard.append([UPLOAD_REPLACEMENTS_FILE])
-        # if self.scheduler:
-        #     keyboard.append(['Обновить расписание'])
-        return keyboard
+        return self._keyboard()

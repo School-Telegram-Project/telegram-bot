@@ -105,40 +105,38 @@ def save_replacements_from_docx(file: str) -> int:
             replaced_teachers.append(text)
     replaced_teachers.pop(0)
 
-    data = []
+    file_data = []
     for j in range(min(len(replaced_teachers), len(document.tables))):
         table = document.tables[j]
-        d = []
-        k = []
-        r = []
+        table_data = []
+        keys = []
         for col, table in enumerate(table.rows):
             text = (cell.text for cell in table.cells)
             if col == 0:
-                k = tuple(text)
+                keys = tuple(text)
                 continue
-            r = dict(zip(k, text))
-            d.append(r)
-        data.append(d)
+            table_data.append(dict(zip(keys, text)))
+        file_data.append(table_data)
 
     db_data = []
     keys = [ 'Класс', 'Заменяющий учитель', '№ урока', 'Кабинет' ]
-    for i, table in enumerate(data):
+    for i, table in enumerate(file_data):
         for _, row in enumerate(table):
             if not isinstance(row, dict):
                 continue
-            d = []
-            for j, k in enumerate(keys):
-                v = row[k]
+            table_data = []
+            for j, keys in enumerate(keys):
+                v = row[keys]
                 if not (j <= 1 or (j > 1 and (v.isdigit() or v == ''))):
-                    d = None
+                    table_data = None
                     break
                 if v == '' or v.isspace():
-                    d.append('NULL')
+                    table_data.append('NULL')
                     continue
-                d.append(v)
-            if d is not None:
-                d.append(replaced_teachers[i])
-                db_data.append(d)
+                table_data.append(v)
+            if table_data is not None:
+                table_data.append(replaced_teachers[i])
+                db_data.append(table_data)
     return save_replacement(db_data)
 
 def save_replacement(data: list) -> int:

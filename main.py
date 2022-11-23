@@ -57,9 +57,12 @@ def start(update: Update, context: CallbackContext) -> None:
     # _ = get_translator(update.effective_user.language_code)
     _ = str
     user = auth(update.effective_user.id)
+    logs.message(f'User {update.effective_user.id} sended /start')
     if user is None:
+        logs.message(f'User {update.effective_chat.id} is not active user')
         data = files.find_user(update.effective_chat.id)
         if data is not None:
+            logs.message(f'User {update.effective_chat.id} was found by ID')
             users.append(User(data))
         else:
             keyboard = [ [KeyboardButton('Отправить номер', request_contact=True)] ]
@@ -75,11 +78,10 @@ def start(update: Update, context: CallbackContext) -> None:
             )
             update.message.reply_text(text=text, parse_mode=HTML, reply_markup=reply_markup)
             return
-    logs.message(f'User {user.id} sended /start')
     user.state = 0
-    reply_markup = ReplyKeyboardMarkup(user.keyboard(),
+    reply_markup = ReplyKeyboardMarkup(user.keyboard,
                                         resize_keyboard=True)
-    text = _('Выберите действие с помощью клавиатуры...')
+    text = _('Выберите действие с помощью кнопок...')
     update.message.reply_text(text=text, reply_markup=reply_markup)
 
 def help(update: Update, context: CallbackContext) -> None:
@@ -106,9 +108,11 @@ def contact(update: Update, context: CallbackContext) -> None:
         return
     data = files.find_user(ct.user_id, ct.phone_number)
     if data is None:
+        logs.message(f'User {update.effective_user.id} was not found')
         # TODO: Сообщение
         context.bot.send_message(chat_id=update.effective_chat.id, text='нет в базе')
         return
+    logs.message(f'User {update.effective_user.id} was found by phone number')
     users.append(User(data))
     start(update, context)
 
