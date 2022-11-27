@@ -13,8 +13,8 @@ def setup(logs_path='') -> None:
     Logging setup
     Настройка логирования
     '''
-    if logs_path == '' and  sys.stdout.isatty():
-        logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    if logs_path == '' and sys.stdout.isatty():
+        logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',
                             datefmt='%H:%M:%S',
                             level=logging.INFO)
         return
@@ -33,11 +33,11 @@ def setup(logs_path='') -> None:
 
     logging.basicConfig(filename=logs_path,
                         filemode='a',
-                        format='%(asctime)s,%(msecs)d,%(name)s,%(levelname)s,%(message)s',
+                        format='%(asctime)s,%(msecs)d,%(levelname)s,%(message)s',
                         datefmt='%H:%M:%S',
                         level=logging.INFO)
 
-def message(text, level=0) -> None:
+def message(text: str, level=0) -> None:
     '''
     Send message to logs
     Отправить сообщение в логи
