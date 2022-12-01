@@ -28,8 +28,6 @@ _DATE_PATTERN = (
     '([0-9]+)'
 )
 _MONTHS = ('янв', 'фев', 'мар', 'апр', 'ма', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек')
-_SINGLE_GROUP = 'весь класс'
-_GROUPS_PATTERN = f'({_SINGLE_GROUP})|([0-9])(?: группы)'
 
 def find_user(telegram_id: int, phone_num = '') -> User:
     '''
@@ -146,15 +144,18 @@ def teacher_parse(text: str) -> str:
     '''
     Parse teacher field to normalized string
     '''
-    # TODO
-    words = re.split(r'[\s()]', text)
-    groups = re.findall(_GROUPS_PATTERN, words[-1], re.I)
-    if groups:
-        if groups[0] == _SINGLE_GROUP:
-            words.pop(len(words) - 1)
+    matches = re.findall(r'[(]+.*([0-9]+).*|.*[)]+', text)
+    if matches:
+        match = matches[0]
+        if isinstance(match, str) and match.isalpha():
+            text = text[:text.index('(')].strip()
+            groups = match.group(0)
         else:
-            words[-1] = str(groups[0])
-    return ' '.join(words)
+            groups = 0
+    else:
+        groups = 0
+    words = re.split(r'\s', text)
+    return (' '.join(words), groups)
 
 def replacements_from_file(file_path: str) -> tuple:
     '''
@@ -183,7 +184,7 @@ def replacements_from_file(file_path: str) -> tuple:
                 row_data = {'Заменённый учитель': replaced_teachers[-1]}
                 for k, text in zip(keys, (cell.text for cell in row.cells)):
                     if k == keys[-1]:
-                        row_data[k] = teacher_parse(text)
+                        row_data[k], row_data['Группа'] = teacher_parse(text)
                     else:
                         row_data[k] = text.strip()
                 if not isinstance(replacements.get(date), list):
@@ -220,6 +221,13 @@ def replacements_from_file(file_path: str) -> tuple:
 #                 db_data.append(table_data)
 #     return _save_replacement(db_data, mode)
 
+def value_or_null(value: str) -> str:
+    '''
+    Return value if not None, or NULL
+    Возвращает значение, если оно есть, или NULL
+    '''
+    return f"'{value}'" if value != _NULL else _NULL_QUOTE
+
 # def _save_replacement(data: list, mode = 0) -> int:
 def save_replacement(data: list) -> int:
     '''
@@ -233,37 +241,36 @@ def save_replacement(data: list) -> int:
             cursor = connection.cursor()
             query = (
                 "CREATE TABLE IF NOT EXISTS replacements (\n"
-                "\tid INTEGER PRIMARY KEY,\n"
-                "\tClass TEXT NOT NULL,\n"
-                "\tTeacher TEXT NOT NULL,\n"
-                "\tLesson INTEGER NOT NULL,\n"
-                "\tRoom TEXT,\n"
-                "\treplaced_teacher TEXT NOT NULL);"
-            )
-            cursor.execute(query)
-
-            end = len(data) - 1
-            # if mode == 0:
-            query = (
+                "  id INTEGER PRIMARY KEY,\n"
+                "  class TEXT NOT NULL,\n"
+                "  teacher TEXT NOT NULL,\n"
+                "  lesson INTEGER NOT NULL,\n"
+                "  lesson_date TEXT NOT NULL,\n"
+                "  class_group INTEGER,\n"
+                "  room TEXT,\n"
+                "  replaced_teacher TEXT NOT NULL);"
                 "DELETE FROM replacements;\n"
                 "DELETE FROM sqlite_sequence WHERE name='replacements';"
             )
             cursor.executescript(query)
-            cursor.fetchall()
 
-            query = (
-                    "INSERT INTO replacements "
-                    "(class,teacher,lesson,room,replaced_teacher)\n"
-                    "VALUES"
-            )
-            for i, values in enumerate(data):
-                query += (
-                    f"\n\t'{values['Класс']}','{values['Заменённый учитель']}',"
-                    f"{values['№ урока']},"
-                    f"{values['Класс'] if values['Класс'] != _NULL else _NULL_QUOTE},"
-                    f"'{values['Заменяющий учитель']}'{',' if i < end else ';'}"
+            end = len(data) - 1
+            # if mode == 0:
+
+            for _, date in enumerate(data):
+                query = (
+                        "INSERT INTO replacements "
+                        "(class,teacher,lesson,lesson_date,class_group,room,replaced_teacher)\n"
+                        "VALUES"
                 )
-            cursor.execute(query)
+                for i, values in enumerate(data[date]):
+                    query += (
+                        f"\n  '{values['Класс']}','{values['Заменённый учитель'][0]}',"
+                        f"{values['№ урока']},'{'.'.join(date)}',{values['Группа']},"
+                        f"{value_or_null(values['Кабинет'])},"
+                        f"'{values['Заменяющий учитель']}'{',' if i < end else ';'}"
+                    )
+                cursor.execute(query)
             cursor.fetchall()
             changes = cursor.rowcount
             cursor.close()
