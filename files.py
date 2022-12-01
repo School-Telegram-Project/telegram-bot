@@ -4,24 +4,32 @@ File operation module
 '''
 
 import sqlite3
+import re
 
 from docx import Document
+from docx.document import Document as _Document
+from docx.oxml.text.paragraph import CT_P
+from docx.oxml.table import CT_Tbl
+from docx.table import _Cell, Table, _Row
+from docx.text.paragraph import Paragraph
 
 import logs
 from user import User
 
 _NULL = "NULL"
 _NULL_QUOTE = f"'{_NULL}'"
+_DATE_PATTERN = (
+    '(0?[1-9]|[12][0-9]|3[01]) '
 
-def int_phone(phone_num: str) -> int:
-    '''
-    Turns phone number string into number
-    Переводит строковый номер телефона в число
-    '''
-    phone_num = phone_num.strip().replace(' ', '')
-    if phone_num.count('+') > 0:
-        phone_num = str(int(phone_num[1]) + 1) + phone_num[2:]
-    return int(phone_num)
+    '(янв(?:аря)?|фев(?:раля)?|мар(?:та)?|апр(?:еля)?|'
+    'ма(?:я)|июн(?:я)?|июл(?:я)?|авг(?:уста)?|сен(?:тября)?|'
+    'окт(?:ября)?|ноя(?:бря)?|дек(?:абря)?) '
+
+    '([0-9]+)'
+)
+_MONTHS = ('янв', 'фев', 'мар', 'апр', 'ма', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек')
+_SINGLE_GROUP = 'весь класс'
+_GROUPS_PATTERN = f'({_SINGLE_GROUP})|([0-9])(?: группы)'
 
 def find_user(telegram_id: int, phone_num = '') -> User:
     '''
@@ -39,7 +47,7 @@ def find_user(telegram_id: int, phone_num = '') -> User:
                     '\tname,\n'
                     '\treplacer,\n'
                     '\tscheduler,\n'
-                #  '\tdispatcher,\n'
+                 #  '\tdispatcher,\n'
                     '\tadmin\n'
                     'FROM staff\n'
                 f'WHERE telegram_id = {telegram_id};'
@@ -55,7 +63,7 @@ def find_user(telegram_id: int, phone_num = '') -> User:
             if phone_num == '':
                 return None
 
-            phone_num = int_phone(phone_num)
+            phone_num = int(phone_num)
             query = (
                  'SELECT DISTINCT\n'
                  '\tname,\n'
@@ -68,10 +76,10 @@ def find_user(telegram_id: int, phone_num = '') -> User:
                 f'WHERE phone_num = {phone_num};'
             )
             cursor.execute(query)
-            row = cursor.fetchall()
-            if not row:
+            data = cursor.fetchall()
+            if not data:
                 return None
-            if row[0][-1] in (None, _NULL):
+            if data[0][-1] in (None, _NULL):
                 query = (
                      'UPDATE staff\n'
                     f'SET telegram_id = {telegram_id}\n'
@@ -79,8 +87,7 @@ def find_user(telegram_id: int, phone_num = '') -> User:
                 )
                 cursor.execute(query)
                 cursor.fetchall()
-            data = row[0][:-1]
-            return User(data)
+            return User(data[0][:-1])
     except sqlite3.Error as sql_error:
         logs.message(f'Error occured while searching for user {telegram_id}: {sql_error}')
 
@@ -111,6 +118,44 @@ def find_user(telegram_id: int, phone_num = '') -> User:
 #         return -1
 
 # def save_replacements(file: str, mode = 0) -> int:
+
+
+def iter_block_items(parent) -> object:
+    """
+    Generate a reference to each paragraph and table child within *parent*,
+    in document order. Each returned value is an instance of either Table or
+    Paragraph. *parent* would most commonly be a reference to a main
+    Document object, but also works for a _Cell object, which itself can
+    contain paragraphs and tables.
+    """
+    if isinstance(parent, _Document):
+        parent_elm = parent.element.body
+    elif isinstance(parent, _Cell):
+        parent_elm = parent._tc
+    elif isinstance(parent, _Row):
+        parent_elm = parent._tr
+    else:
+        raise ValueError("Docx reading error")
+    for child in parent_elm.iterchildren():
+        if isinstance(child, CT_P):
+            yield Paragraph(child, parent)
+        elif isinstance(child, CT_Tbl):
+            yield Table(child, parent)
+
+def teacher_parse(text: str) -> str:
+    '''
+    Parse teacher field to normalized string
+    '''
+    # TODO
+    words = re.split(r'[\s()]', text)
+    groups = re.findall(_GROUPS_PATTERN, words[-1], re.I)
+    if groups:
+        if groups[0] == _SINGLE_GROUP:
+            words.pop(len(words) - 1)
+        else:
+            words[-1] = str(groups[0])
+    return ' '.join(words)
+
 def replacements_from_file(file_path: str) -> tuple:
     '''
     Extracts data from replacements document
@@ -118,31 +163,36 @@ def replacements_from_file(file_path: str) -> tuple:
     '''
     document = Document(file_path)
     replaced_teachers = []
-    for _, par in enumerate(document.paragraphs):
-        text = par.text
-        if isinstance(text, str) and text != '' and not text.isspace():
-            replaced_teachers.append(text)
-    replaced_teachers.pop(0)
-
-    data = []
     replacing_teachers = set()
-    tables = zip(replaced_teachers, document.tables)
+    replacements = {}
+    date = tuple()
     keys = ('№ урока', 'Время', 'Класс', 'Кабинет', 'Заменяющий учитель')
-    for teacher, table in tables:
-        if len(table.rows) < 2:
-            continue
-        for row in table.rows[1:]:
-            row_data = {'Заменённый учитель': teacher}
-            for key, text in zip(keys, (cell.text for cell in row.cells)):
-                if key == keys[-1]:
-                    row_data[key] = ' '.join(t.strip() for t in text.split('. '))
+    for block in iter_block_items(document):
+        if isinstance(block, Paragraph):
+            text = block.text
+            d = re.findall(_DATE_PATTERN, text, re.I)
+            if d and len(d[0]) == 3:
+                d = d[0]
+                date = int(d[0]), _MONTHS.index(str(d[1][:3] if len(d) > 2 else d[1])), int(d[2])
+            else:
+                replaced_teachers.append(teacher_parse(text))
+        elif isinstance(block, Table):
+            if len(block.rows) < 2:
+                continue
+            for row in block.rows[1:]:
+                row_data = {'Заменённый учитель': replaced_teachers[-1]}
+                for k, text in zip(keys, (cell.text for cell in row.cells)):
+                    if k == keys[-1]:
+                        row_data[k] = teacher_parse(text)
+                    else:
+                        row_data[k] = text.strip()
+                if not isinstance(replacements.get(date), list):
+                    replacements[date] = [row_data]
                 else:
-                    row_data[key] = text.strip()
-            data.append(row_data)
-            repl_teacher = str(row_data[keys[-1]])
-            if repl_teacher not in replaced_teachers:
-                replacing_teachers.add(repl_teacher)
-    return replacing_teachers, data
+                    replacements[date].append(row_data)
+                replacing_teachers.add(row_data[keys[-1]])
+
+    return replacing_teachers, replacements
 
 # def save_replacements(file: str) -> int:
 #     '''
@@ -191,7 +241,6 @@ def save_replacement(data: list) -> int:
                 "\treplaced_teacher TEXT NOT NULL);"
             )
             cursor.execute(query)
-            cursor.fetchall()
 
             end = len(data) - 1
             # if mode == 0:
@@ -199,7 +248,8 @@ def save_replacement(data: list) -> int:
                 "DELETE FROM replacements;\n"
                 "DELETE FROM sqlite_sequence WHERE name='replacements';"
             )
-            cursor.executemany(query)
+            cursor.executescript(query)
+            cursor.fetchall()
 
             query = (
                     "INSERT INTO replacements "

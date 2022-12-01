@@ -27,9 +27,9 @@ def setup(logs_path='') -> None:
         logs_path = Path(logs_path)
     if logs_path.is_file():
         logs_path.unlink()
-    logs_path.mkdir(exists_ok=True)
+    logs_path.mkdir(exist_ok=True)
     logs_path = logs_path / file_name
-    logs_path.touch(exists_ok=True)
+    logs_path.touch()
 
     logging.basicConfig(filename=logs_path,
                         filemode='a',

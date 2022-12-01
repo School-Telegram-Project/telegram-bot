@@ -231,17 +231,16 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # _ = get_translator(update.effective_user.language_code)
         _ = str
         document = update.message.document
-        logs.message(f'User {update.effective_user.id} has uploaded file {document.file_name}')
+        logs.message(f'User {update.effective_user.id} has uploaded file "{document.file_name}"')
         file_type = document.file_name.split('.')[-1]
-        time = datetime.now().time().isoformat('seconds')
-        filename = f'/mnt/data/Programming/telegram-bot/downloads/{time}.{file_type}'
-        logs.message(f'Download name: {filename}')
+        time = datetime.now().time().isoformat('seconds').replace(':', '.')
         doc_file = await context.bot.get_file(document.file_id)
         file_path = SELF_FOLDER / 'downloads' / f'{time}.{file_type}'
         await doc_file.download_to_drive(file_path)
         if user.state[0] == 1:
             teachers, data = files.replacements_from_file(file_path)
-            unsaved = files.save_replacement(data)
+            to_save = len(data)
+            saved = files.save_replacement(data)
             text = _('! <b>У вас есть новые замены</b> !')
             reply_markup = ReplyKeyboardMarkup(user.keyboard(bot_running), resize_keyboard=True)
             for __, usr_id in enumerate(users):
@@ -249,13 +248,14 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 if usr.name in teachers and usr_id != update.effective_user.id:
                     await context.bot.send_message(chat_id=usr_id, text=text,
                                                    parse_mode=HTML, reply_markup=reply_markup)
-            text = _('Данные сохранены.')
-            #     if result:
-            #         text = _('Возникла ошибка, не удалось загрузить часть данных.')
-            # # elif user.state == 2:
-            # #    logs.message(f'File name: )
-            #     text += f'\n{result}'
-            #     await context.bot.send_message(chat_id = update.effective_chat.id, text=text)
+            if saved < to_save:
+                text = _('Возникла проблема с сохранением данных, '
+                        f'загружено {saved} из {to_save} замен.')
+            else:
+                text = _('Данные сохранены.')
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
+        # elif user.state == 2:
+        # TODO: расписание
         user.state = 0
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
