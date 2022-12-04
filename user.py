@@ -3,8 +3,15 @@ Module for User class
 Модуль для класса User
 '''
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
+VIEW_REPLACEMENTS = 'Посмотреть мои замены'
+UPLOAD_REPLACEMENTS_FILE = 'Загрузить файл замен'
+ENABLE_BOT = 'Запустить бота'
+DISABLE_BOT = 'Выключить бота'
+DOWNLOAD = 'Скачать последний лог-файл'
+# ADD_USER = 'Добавить нового пользователя'
+# DELETE_USER = 'Удалить пользователя'
 
 @dataclass
 class User:
@@ -12,41 +19,42 @@ class User:
     User's data
     Данные пользователя
     '''
-    id: int
     name: str
-    full_name: str = ''
-    replacer: bool = True
-    dispatcher: bool = False
-    scheduler: bool = False
+    replacer: bool
+    scheduler: bool
+    # dispatcher: bool = False
+    admin: bool
     state: int = 0
 
-    def __init__(self, id:int, args: list):
-        self.id = id
+    def __init__(self, args: tuple):
+        # if len(args) < 5:
+        if len(args) < 4:
+            raise ValueError()
         self.name = args[0]
-        if isinstance(args[1], str):
-            self.full_name = args[1]
-        self.replacer = bool(args[2])
-        self.dispatcher = bool(args[3])
-        self.scheduler = bool(args[4])
+        self.replacer = bool(args[1])
+        self.scheduler = bool(args[2])
+        # self.dispatcher = bool(args[3])
+        # self.admin = bool(agrs[4])
+        self.admin = bool(args[3])
         self.state = 0
 
-    def __eq__(self, o):
-        return (isinstance(o, User) and o.id == self.id) or (isinstance(o, int) and o == self.id)
-
-    def __str__(self):
-        return str(self.id)
-
-    def keyboard(self):
+    def keyboard(self, bot_running: bool) -> list:
         '''
         Create Telegram keyboard markup based on user's privileges
         Создать набор клавиш на основе привелегий пользователя
         '''
-        keyboard = []
-        if self.replacer:
-            keyboard.append(['Посмотреть замены'])
-        if self.dispatcher:
-            # keyboard.append(['Добавить замены вручную', 'Загрузить файл замен'])
-            keyboard.append(['Загрузить файл замен'])
-        if self.scheduler:
-            keyboard.append(['Обновить расписание'])
-        return keyboard
+        _keyboard = []
+        if bot_running and self.replacer:
+            _keyboard.append([VIEW_REPLACEMENTS])
+        if bot_running and self.scheduler:
+            # kb.append(['Добавить замены вручную', 'Загрузить файл замен'])
+            _keyboard.append([UPLOAD_REPLACEMENTS_FILE])
+        # if bot_running and self.dispatcher:
+        #     kb.append(['Обновить расписание'])
+        if self.admin:
+            _keyboard.extend([
+                [DISABLE_BOT if bot_running else ENABLE_BOT]
+                # [DOWNLOAD]
+                # [ADD_USER, DELETE_USER]
+            ])
+        return _keyboard
