@@ -5,6 +5,7 @@ File operation module
 
 import sqlite3
 import re
+from datetime import datetime
 
 from docx import Document
 from docx.document import Document as _Document
@@ -16,18 +17,8 @@ from docx.text.paragraph import Paragraph
 import logs
 from user import User
 
-_NULL = "NULL"
-_NULL_QUOTE = f"'{_NULL}'"
-_DATE_PATTERN = (
-    '(0?[1-9]|[12][0-9]|3[01]) '
+from constants.files import *
 
-    '(янв(?:аря)?|фев(?:раля)?|мар(?:та)?|апр(?:еля)?|'
-    'ма(?:я)|июн(?:я)?|июл(?:я)?|авг(?:уста)?|сен(?:тября)?|'
-    'окт(?:ября)?|ноя(?:бря)?|дек(?:абря)?) '
-
-    '([0-9]+)'
-)
-_MONTHS = ('янв', 'фев', 'мар', 'апр', 'ма', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек')
 
 def find_user(telegram_id: int, phone_num = '') -> User:
     '''
@@ -35,7 +26,7 @@ def find_user(telegram_id: int, phone_num = '') -> User:
     Находит пользователя в базе данных по номеру телефона или ID Telegram'а
     '''
     try:
-        with sqlite3.connect('data') as connection:
+        with sqlite3.connect('database') as connection:
             cursor = connection.cursor()
 
             # Find user by ID
@@ -53,7 +44,7 @@ def find_user(telegram_id: int, phone_num = '') -> User:
             cursor.execute(query)
             data = cursor.fetchall()
             if data:
-                return User(data[0])
+                return zip(USER_DATATYPES, data[0])
 
 
             # Find user by phone
@@ -77,7 +68,7 @@ def find_user(telegram_id: int, phone_num = '') -> User:
             data = cursor.fetchall()
             if not data:
                 return None
-            if data[0][-1] in (None, _NULL):
+            if data[0][-1] in (None, NULL):
                 query = (
                      'UPDATE staff\n'
                     f'SET telegram_id = {telegram_id}\n'
@@ -85,7 +76,7 @@ def find_user(telegram_id: int, phone_num = '') -> User:
                 )
                 cursor.execute(query)
                 cursor.fetchall()
-            return User(data[0][:-1])
+            return zip(USER_DATATYPES, data[0][:-1])
     except sqlite3.Error as sql_error:
         logs.message(f'Error occured while searching for user {telegram_id}: {sql_error}')
 
@@ -140,22 +131,28 @@ def iter_block_items(parent) -> object:
         elif isinstance(child, CT_Tbl):
             yield Table(child, parent)
 
-def teacher_parse(text: str) -> str:
+def teacher_parse(text: str) -> tuple:
     '''
-    Parse teacher field to normalized string
+    Parse teacher field to normalized string and group
+    Приводит поле "учитель" к нормализированной строке и группе
     '''
-    matches = re.findall(r'[(]+.*([0-9]+).*|.*[)]+', text)
+    groups = 0
+    matches = re.findall(r'[(]+[\D]*?([0-9]*)[\D]*?[)]+', text)
     if matches:
-        match = matches[0]
-        if isinstance(match, str) and match.isalpha():
-            text = text[:text.index('(')].strip()
-            groups = match.group(0)
-        else:
-            groups = 0
-    else:
-        groups = 0
-    words = re.split(r'\s', text)
-    return (' '.join(words), groups)
+        m = matches[0]
+        text = text[:text.index('(')].strip()
+        if len(m):
+            groups = int(m)
+    words = re.findall(r'([А-ЯЁ][а-яё]+)[\s]*([А-ЯЁа-яё]*)[\s.]*([А-ЯЁа-яё]*)', text)
+    if words and words[0]:
+        words = words[0]
+        string = words[0]
+        if len(words) > 1 and words[1] != '':
+            string += ' ' + words[1][0]
+        if len(words) > 2 and words[2] != '':
+            string += ' ' + words[2][0]
+        return (string, groups)
+    return None
 
 def replacements_from_file(file_path: str) -> tuple:
     '''
@@ -170,23 +167,47 @@ def replacements_from_file(file_path: str) -> tuple:
     keys = ('№ урока', 'Время', 'Класс', 'Кабинет', 'Заменяющий учитель')
     for block in iter_block_items(document):
         if isinstance(block, Paragraph):
-            text = block.text
-            d = re.findall(_DATE_PATTERN, text, re.I)
+            text = block.text.strip()
+            if text == '':
+                continue
+            d = re.findall(DATE_PATTERN, text, re.I)
             if d and len(d[0]) == 3:
                 d = d[0]
-                date = int(d[0]), _MONTHS.index(str(d[1][:3] if len(d) > 2 else d[1])), int(d[2])
+                date = datetime(
+                    int(d[2]),
+                    MONTHS.index(str(d[1][:3] if len(d) > 2 else d[1])),
+                    int(d[0])
+                    )
+                if date < datetime.now():
+                    date = None
+                else:
+                    date = f'{date.year}.{date.month}.{date.day}'
             else:
-                replaced_teachers.append(teacher_parse(text))
+                teacher = teacher_parse(text)
+                if teacher:
+                    replaced_teachers.append(teacher[0])
         elif isinstance(block, Table):
-            if len(block.rows) < 2:
+            if len(block.rows) < 2 or date is None:
                 continue
             for row in block.rows[1:]:
+                exit_flag = False   # Отсутствует заменяющий учитель
                 row_data = {'Заменённый учитель': replaced_teachers[-1]}
                 for k, text in zip(keys, (cell.text for cell in row.cells)):
+                    text = text.strip()
                     if k == keys[-1]:
-                        row_data[k], row_data['Группа'] = teacher_parse(text)
+                        if text == '':
+                            exit_flag = True
+                            break
+                        parsed_str = teacher_parse(text)
+                        if parsed_str:
+                            row_data[k], row_data['Группа'] = parsed_str
+                        else:
+                            exit_flag = True
+                            break
                     else:
                         row_data[k] = text.strip()
+                if exit_flag:
+                    continue
                 if not isinstance(replacements.get(date), list):
                     replacements[date] = [row_data]
                 else:
@@ -195,49 +216,16 @@ def replacements_from_file(file_path: str) -> tuple:
 
     return replacing_teachers, replacements
 
-# def save_replacements(file: str) -> int:
-#     '''
-#     Returns amount of affected rows
-#     Возвращает количество изменённых строк
-#     '''
-#     db_data = []
-#     keys = [ 'Класс', 'Заменяющий учитель', '№ урока', 'Кабинет' ]
-#     for i, table in enumerate(file_data):
-#         for _, row in enumerate(table):
-#             if not isinstance(row, dict):
-#                 continue
-#             table_data = []
-#             for j, key in enumerate(keys):
-#                 v = row[key]
-#                 if not (j <= 1 or (j > 1 and (v.isdigit() or v == ''))):
-#                     table_data = None
-#                     break
-#                 if v == '' or v.isspace():
-#                     table_data.append(_NULL)
-#                     continue
-#                 table_data.append(v)
-#             if table_data is not None:
-#                 table_data.append(replaced_teachers[i])
-#                 db_data.append(table_data)
-#     return _save_replacement(db_data, mode)
-
-def value_or_null(value: str) -> str:
-    '''
-    Return value if not None, or NULL
-    Возвращает значение, если оно есть, или NULL
-    '''
-    return f"'{value}'" if value != _NULL else _NULL_QUOTE
-
 # def _save_replacement(data: list, mode = 0) -> int:
 def save_replacement(data: list) -> int:
     '''
     Save replacements data to database
-    Returns amount of UNaffected rows
+    Returns amount of affected rows
     Сохранение замен в базе данных
-    Возвращает количество НЕизменённых строк
+    Возвращает количество изменённых строк
     '''
     try:
-        with sqlite3.connect('data') as connection:
+        with sqlite3.connect('database') as connection:
             cursor = connection.cursor()
             query = (
                 "CREATE TABLE IF NOT EXISTS replacements (\n"
@@ -254,7 +242,7 @@ def save_replacement(data: list) -> int:
             )
             cursor.executescript(query)
 
-            end = len(data) - 1
+            changes_count = 0
             # if mode == 0:
 
             for _, date in enumerate(data):
@@ -263,18 +251,24 @@ def save_replacement(data: list) -> int:
                         "(class,teacher,lesson,lesson_date,class_group,room,replaced_teacher)\n"
                         "VALUES"
                 )
-                for i, values in enumerate(data[date]):
+                for _, values in enumerate(data[date]):
                     query += (
-                        f"\n  '{values['Класс']}','{values['Заменённый учитель'][0]}',"
-                        f"{values['№ урока']},'{'.'.join(date)}',{values['Группа']},"
-                        f"{value_or_null(values['Кабинет'])},"
-                        f"'{values['Заменяющий учитель']}'{',' if i < end else ';'}"
+                         "\n  ("
+                        f"'{values['Класс']}',"
+                        f"'{values['Заменяющий учитель']}',"
+                        f"{values['№ урока']},"
+                        f"'{date}',"
+                        f"{values['Группа']},"
+                        f"'{values['Кабинет'] if values['Кабинет'] != '' else NULL}',"
+                        f"'{values['Заменённый учитель']}'"
+                        f"),"
                     )
+                query = query[:-1] + ";"
                 cursor.execute(query)
+                changes_count += cursor.rowcount
             cursor.fetchall()
-            changes = cursor.rowcount
             cursor.close()
-            return len(data) - changes
+            return changes_count
     except sqlite3.Error as error:
         logs.message(f'Can not save data to database: {error}', 2)
         return -1
@@ -285,20 +279,16 @@ def read_replacements(teacher: str) -> list:
     Чтение данных из базы замен
     '''
     try:
-        with sqlite3.connect('data') as connection:
+        with sqlite3.connect('database') as connection:
             cursor = connection.cursor()
             select_query = (
-                 "SELECT\n"
-                 "\tClass,\n"
-                 "\tLesson,\n"
-                 "\tRoom\n"
+                 "SELECT class, teacher, lesson, lesson_date, class_group, room, replaced_teacher\n"
                  "FROM replacements\n"
-                f"WHERE Teacher = '{teacher}'"
-                 "ORDER BY Lesson;"
+                f"WHERE teacher = '{teacher}'\n"
+                 "ORDER BY lesson_date;"
             )
             cursor.execute(select_query)
             rows = cursor.fetchall()
-            # logs.message(rows)
         return rows
     except sqlite3.Error as error:
         logs.message(f'Can not read database: {error}', 2)

@@ -12,34 +12,27 @@ from sys import argv, exit
 
 from telegram import (KeyboardButton, ReplyKeyboardMarkup,
                       InlineKeyboardButton, InlineKeyboardMarkup, Update)
+# from telegram.ext import (Application, ContextTypes, CommandHandler,
+#                           CallbackQueryHandler, MessageHandler, PicklePersistence)
 from telegram.ext import (Application, ContextTypes, CommandHandler,
-                          CallbackQueryHandler, MessageHandler)
-from telegram.ext.filters import (TEXT as TEXT_FILTER, Regex as Regex_filter,
-                                  CONTACT as CONTACT_FILTER,
-                                  Document as Document_filter, COMMAND as COMMAND_FILTER)
-from telegram.constants import ParseMode
+                          MessageHandler, PicklePersistence)
+
+
+from telegram.error import Forbidden as Telegram_Forbidden
 
 import files
 import logs
-from user import (User, VIEW_REPLACEMENTS, UPLOAD_REPLACEMENTS_FILE,
-                  ENABLE_BOT, DISABLE_BOT, DOWNLOAD)
+# from user import (User, VIEW_REPLACEMENTS, UPLOAD_REPLACEMENTS_FILE,
+#                   ENABLE_BOT, DISABLE_BOT, DOWNLOAD)
 
-SELF_FOLDER = None
-MAIN_HANDLERS = None
-PERMANENT_HANDLERS = None
-DOCUMENT_FILTER = Document_filter.FileExtension('doc') | Document_filter.FileExtension('docx')
-VIEW_REPLACEMENTS_FILTER = TEXT_FILTER & Regex_filter('(?i)' + VIEW_REPLACEMENTS)
-UPLOAD_REPLACEMENTS_FILTER = TEXT_FILTER & Regex_filter('(?i)' + UPLOAD_REPLACEMENTS_FILE)
-ENABLE_BOT_FILTER = TEXT_FILTER & Regex_filter('(?i)' + ENABLE_BOT)
-DISABLE_BOT_FILTER = TEXT_FILTER & Regex_filter('(?i)' + DISABLE_BOT)
-# DOWNLOAD_FILTER = TEXT_FILTER & Regex_filter('(?i)' + DOWNLOAD)
-# ADD_USER_FILTER = TEXT_FILTER & Regex_filter('(?i)' + ADD_USER)
-# DELETE_USER_FILTER = TEXT_FILTER & Regex_filter('(?i)' + DELETE_USER)
-HTML = ParseMode.HTML
+from constants.main import *
+
 
 application = None
-users = None
+persistence = None
 bot_running = False
+main_handlers = None
+permantent_handlers = None
 
 # def get_translator(lang: str = 'ru'):
 #     '''
@@ -49,16 +42,6 @@ bot_running = False
 #     trans = gettext.translation('', localedir=SELF_PATH/'locale', languages=(lang,))
 #     return trans.gettext
 
-def auth(user_id) -> User:
-    '''
-    Find user or return None
-    Найти пользователя или вернуть None
-    '''
-    if user_id in users.keys():
-        result = users[user_id]
-    else:
-        result = None
-    return result
 
 # def new_user(data: tuple) -> int:
 #     '''
@@ -85,7 +68,35 @@ def auth(user_id) -> User:
 #     logs.message(text, level=1)
 #     return result
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, user = None) -> None:
+def user_keyboard(user_data):
+    '''
+    Create keyboard based on user data (what user can do)
+    Создать клавиатуру на основе данных пользователя (того, что он может сделать)
+    '''
+    _keyboard = []
+    if bot_running and 'replacer' in user_data and user_data['replacer']:
+        _keyboard.append([VIEW_REPLACEMENTS])
+    if bot_running and 'scheduler' in user_data and user_data['scheduler']:
+        # kb.append(['Добавить замены вручную', 'Загрузить файл замен'])
+        _keyboard.append([UPLOAD_REPLACEMENTS_FILE])
+    # if bot_running and self.dispatcher:
+    #     kb.append(['Обновить расписание'])
+    if 'admin' in user_data and user_data['admin']:
+        _keyboard.extend([
+            [DISABLE_BOT if bot_running else ENABLE_BOT]
+            # [DOWNLOAD]
+            # [ADD_USER, DELETE_USER]
+        ])
+    return _keyboard
+
+def auth(user_id: int, bot_data: dict) -> bool:
+    '''
+    Check if user is authorized
+    Проверить, авторизирован ли пользоваель
+    '''
+    return 'users' in bot_data and user_id in bot_data['users']
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Start command
     Команда старта
@@ -93,13 +104,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, user = None)
     # _ = get_translator(update.effective_user.language_code)
     _ = str
     logs.message(f'User {update.effective_user.id} sended /start')
-    user = auth(update.effective_user.id)
-    if user is None:
+    if not auth(update.effective_user.id, context.bot_data):
+        if 'users' not in context.bot_data:
+            context.bot_data['users'] = set()
         logs.message(f'User {update.effective_chat.id} is not active user')
-        user = files.find_user(update.effective_chat.id)
-        if user is not None:
+        user_data = files.find_user(update.effective_chat.id)
+        if user_data is not None:
             logs.message(f'User {update.effective_chat.id} was found by ID')
-            users[update.effective_user.id] = user
+            context.bot_data['users'].add(update.effective_chat.id)
+            for datatype, value in user_data:
+                context.user_data[datatype] = value
+            context.user_data['id'] = update.effective_user.id
         else:
             keyboard = [ [KeyboardButton('Отправить номер', request_contact=True)] ]
             reply_markup = ReplyKeyboardMarkup(keyboard,
@@ -114,8 +129,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, user = None)
             )
             await update.message.reply_text(text=text, parse_mode=HTML, reply_markup=reply_markup)
             return
-    user.state = 0
-    reply_markup = ReplyKeyboardMarkup(user.keyboard(bot_running), resize_keyboard=True)
+    context.user_data['state'] = (0, 0)
+    persistence.flush()
+    reply_markup = ReplyKeyboardMarkup(user_keyboard(context.user_data), resize_keyboard=True)
     text = _('Выберите действие с помощью кнопок...')
     await update.message.reply_text(text=text, reply_markup=reply_markup)
 
@@ -137,10 +153,9 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     # _ = get_translator(update.effective_user.language_code)
     _ = str
-    user = auth(update.effective_user.id)
-    if user is None:
+    if not auth(update.effective_user.id, context.bot_data):
         return
-    users.pop(update.effective_user.id)
+    context.user_data.clear()
     await start(update, context)
 
 async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -150,60 +165,99 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     # _ = get_translator(update.effective_user.language_code)
     _ = str
-    ct = update.effective_message.contact
-    if update.effective_user.id != ct.user_id:
+    _contact = update.effective_message.contact
+    if update.effective_user.id != _contact.user_id:
         await context.bot.send_message(text=_('Пожалуйста, отправьте <b>свой</b> контакт.'),
                                  chat_id=update.effective_chat.id,
                                  parse_mode=HTML)
         return
-    user = files.find_user(ct.user_id, ct.phone_number)
-    if user is None:
+    user_data = files.find_user(_contact.user_id, _contact.phone_number)
+    if user_data is None:
         logs.message(f'User {update.effective_user.id} was not found')
         text = _('Вы отсутствуете среди списка пользователей.\n'
                  'Пожалуйста, обратитесь к администрации.')
         await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
         return
     logs.message(f'User {update.effective_user.id} was found by phone number')
-    users[update.effective_user.id] = user
-    await start(update, context, user)
+    if 'users' not in context.bot_data:
+        context.bot_data['users'] = {update.effective_chat.id}
+    else:
+        context.bot_data['users'].add(update.effective_chat.id)
+    for datatype, value in user_data:
+        context.user_data[datatype] = value
+    context.user_data['id'] = update.effective_user.id
+    context.user_data['state'] = (0, 0)
+    persistence.flush()
 
 async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Look for replacements that involve user
     Поиск замен для пользователя
     '''
-    user = auth(update.effective_user.id)
-    if user is None:
+    if not auth(update.effective_user.id, context.bot_data):
         return
     # _ = get_translator(update.effective_user.language_code)
     _ = str
     logs.message(f'User {update.effective_user.id} has requested their replacements')
-    replacements = files.read_replacements(user.name)
+    replacements = files.read_replacements(context.user_data['name'])
     if replacements is None:
         text = _('Не удалось прочитать базу данных.')
-        await context.bot.send_message(chat_id = update.effective_chat.id, text=text)
+        await context.bot.send_message(text=text, chat_id = update.effective_chat.id)
         return
     if not replacements: # len(replacements) == 0
         text = _('Замены на сегодня не найдены.')
         await context.bot.send_message(text=text, chat_id=update.effective_chat.id)
         return
 
-    text = _('<b>Замены на сегодня:</b>') + '\n\n'
-    for repl in replacements:
-        text += _('Замена у {0} класса на {1} уроке').format(repl[0], repl[1])
-        if repl[2] != 'NULL':
-            text += _(' в {0} кабиенете').format(repl[2])
-        text += '\n<s>---------</s>\n'
-    text = text[:-18]
-    await context.bot.send_message(text=text, chat_id=update.effective_chat.id, parse_mode=HTML)
+    replacements_texts = {}
+    for i, repl in enumerate(replacements):
+        # class, teacher, lesson, lesson_date, class_group, room, replaced_teacher
+        text = _(
+            'Замена у {class_name} класса на {lesson_num} уроке'
+            '{room}'        # в {room} кабинете
+            '{group}'     # у {group} группы
+            ).format(
+                class_name = repl[0],
+                lesson_num = repl[2],
+                room = ' ' + _('в кабинете {0}').format(repl[5]) if repl[5] != 'NULL' else '',
+                group = ' ' + _('у {0} группы').format(repl[4]) if repl[4] != 0 else ''
+            )
+        if i < len(replacements) - 1:
+            text += '\n\n'
+        date = datetime(*(int(s) for s in repl[3].split('.')))
+        if date not in replacements_texts:
+            replacements_texts[date] = [text]
+        else:
+            replacements_texts[date].append(text)
 
-async def upload_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE, user = None) -> None:
+    for i, date in enumerate(replacements_texts):
+        msg = ''
+        texts = replacements_texts[date]
+        if (datetime.now() - date).days > 0:
+            msg += _('Замены на сегодня:')
+        else:
+            msg += _('Замены на {d}.{m}.{y}:').format(
+                d = date.day,
+                m = date.month,
+                y = date.year
+            )
+        msg += HORIZONTAL_BAR
+        for t in texts:
+            if len(msg) + len(t) > MAX_TEXT_LENGTH:
+                await context.bot.send_message(text=msg, chat_id=update.effective_chat.id,
+                                               parse_mode=HTML)
+                msg = ''
+            else:
+                msg += t
+        msg += HORIZONTAL_BAR
+        await context.bot.send_message(text=msg, chat_id=update.effective_chat.id, parse_mode=HTML)
+
+async def upload_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Upload replacements table
     Загрузить таблицу замен
     '''
-    user = auth(update.effective_user.id)
-    if user is None:
+    if not auth(update.effective_user.id, context.bot_data):
         return
     # _ = get_translator(update.effective_user.language_code)
     _ = str
@@ -217,35 +271,35 @@ async def upload_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE
     text = _('Пожалуйста, загрузите таблицу замен.')
     # await context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_markup=reply_markup)
     await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
-    user.state = (1, 0)
+    context.user_data['state'] = (1, 0)
 
 async def document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Downloading files
     Получение файла
     '''
-    user = auth(update.effective_user.id)
-    if user is None:
+    if not auth(update.effective_user.id, context.bot_data):
         return
-    if user.state[0] in [1, 2]:
+    if context.user_data['state'] in [1, 2]:
         # _ = get_translator(update.effective_user.language_code)
         _ = str
-        document = update.message.document
-        logs.message(f'User {update.effective_user.id} has uploaded file "{document.file_name}"')
-        file_type = document.file_name.split('.')[-1]
+        _document = update.message.document
+        logs.message(f'User {update.effective_user.id} has uploaded file "{_document.file_name}"')
+        file_type = _document.file_name.split('.')[-1]
         time = datetime.now().time().isoformat('seconds').replace(':', '.')
-        doc_file = await context.bot.get_file(document.file_id)
+        doc_file = await context.bot.get_file(_document.file_id)
         file_path = SELF_FOLDER / 'downloads' / f'{time}.{file_type}'
         await doc_file.download_to_drive(file_path)
-        if user.state[0] == 1:
+        if context.user_data['state'][0] == 1:
             teachers, data = files.replacements_from_file(file_path)
             to_save = len(data)
             saved = files.save_replacement(data)
             text = _('! <b>У вас есть новые замены</b> !')
-            reply_markup = ReplyKeyboardMarkup(user.keyboard(bot_running), resize_keyboard=True)
-            for __, usr_id in enumerate(users):
-                usr = users[usr_id]
-                if usr.name in teachers and usr_id != update.effective_user.id:
+            reply_markup = ReplyKeyboardMarkup(user_keyboard(context.user_data),
+                                               resize_keyboard=True)
+            for __, usr_id in enumerate(application.user_data):
+                usr = application.user_data[usr_id]
+                if usr['name'] in teachers and usr_id != update.effective_user.id:
                     await context.bot.send_message(chat_id=usr_id, text=text,
                                                    parse_mode=HTML, reply_markup=reply_markup)
             if saved < to_save:
@@ -256,14 +310,15 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
         # elif user.state == 2:
         # TODO: расписание
-        user.state = 0
+        context.user_data['state'] = (0, 0)
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Handles InlineKeyboard presses
     Обрабатывает нажатия InlineKeyboard
     '''
-    user = auth(update.effective_user.id)
+    if not auth(update.effective_user.id, context.bot_data):
+        return
     query = update.callback_query
     data = query.data
     await query.answer()
@@ -284,57 +339,69 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             text += _('Обновить существующие замены')
             keyboard = [[InlineKeyboardButton(_('Добавить новые замены'), callback_data='00')]]
         await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard))
-        user.state = (user.state[0], int(data[1]))
+        context.user_data['state'] = (context.user_data['state'][0], int(data[1]))
 
 async def enable_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Enable bot for non-admin users by adding main handlers
     Включить бота для не-администаторов, добавив основные обработчики комманд
     '''
-    user = auth(update.effective_user.id)
-    if user is None or not user.admin:
+    if not auth(update.effective_user.id, context.bot_data) or not context.user_data['admin']:
         return
     # _ = get_translator(update.effective_user.language_code)
     _ = str
     global bot_running
     if bot_running:
-        reply_markup = ReplyKeyboardMarkup(user.keyboard(bot_running), resize_keyboard=True)
+        reply_markup = ReplyKeyboardMarkup(user_keyboard(context.user_data), resize_keyboard=True)
         await context.bot.send_message(chat_id=update.effective_chat.id, text=_('Бот уже запущен.'),
                                        reply_markup=reply_markup)
         return
-    application.add_handlers(MAIN_HANDLERS)
+    application.add_handlers(main_handlers)
     bot_running = True
-    reply_markup = ReplyKeyboardMarkup(user.keyboard(bot_running), resize_keyboard=True)
+    reply_markup = ReplyKeyboardMarkup(user_keyboard(context.user_data), resize_keyboard=True)
     await context.bot.send_message(chat_id=update.effective_chat.id, text=_('Бот успешно запущен.'),
                                    reply_markup=reply_markup)
+    logs.message('Bot has been enabled', 1)
 
 async def disable_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Disable bot for non-admin users by removing main handlers
     Выключить бота для не-адмнинстраторов, убрав основные обработчики комманд
     '''
-    user = auth(update.effective_user.id)
-    if user is None or not user.admin:
+    if not auth(update.effective_user.id, context.bot_data) or not context.user_data['admin']:
         return
     # _ = get_translator(update.effective_user.language_code)
     _ = str
     global bot_running
     if not bot_running:
-        reply_markup = ReplyKeyboardMarkup(user.keyboard(bot_running), resize_keyboard=True)
+        reply_markup = ReplyKeyboardMarkup(user_keyboard(context.user_data), resize_keyboard=True)
         await context.bot.send_message(chat_id=update.effective_chat.id,
                                        text=_('Бот уже выключен.'), reply_markup = reply_markup)
         return
-    for handler in MAIN_HANDLERS[0]:
+    for handler in main_handlers[0]:
         application.remove_handler(handler)
     bot_running = False
-    reply_markup = ReplyKeyboardMarkup(user.keyboard(bot_running), resize_keyboard=True)
+    reply_markup = ReplyKeyboardMarkup(user_keyboard(context.user_data), resize_keyboard=True)
     await context.bot.send_message(chat_id=update.effective_chat.id,
                                    text=_('Бот успешно выключен.'), reply_markup = reply_markup)
+    logs.message('Bot has been temporary disabled for users', 1)
+
+async def post_init(app: Application) -> None:
+    '''
+    Restore pre-reload state
+    Восстановить состояние до перезапуска
+    '''
+    if app.bot_data is not None and 'users' in app.bot_data:
+        for user_id in app.bot_data['users']:
+            try:
+                app.bot.get_chat(user_id)
+            except Telegram_Forbidden:
+                app.bot_data['users'].remove(user_id)
 
 if __name__ == '__main__':
-    users = {}
+    users = []
     # Handlers for non-admin users
-    MAIN_HANDLERS = {
+    main_handlers = {
         0: [
         MessageHandler(CONTACT_FILTER, contact),
         MessageHandler(VIEW_REPLACEMENTS_FILTER, view_replacements),
@@ -345,7 +412,7 @@ if __name__ == '__main__':
     }
     # Handlers for admin users and other handlers that should always be active
     # (like start handler)
-    PERMANENT_HANDLERS = {
+    permantent_handlers = {
         -1: [
             CommandHandler('start', start), CommandHandler('help', help_command),
             CommandHandler('reset', reset),
@@ -367,7 +434,10 @@ if __name__ == '__main__':
     except IOError:
         logs.message('No token file')
         exit(1)
-    application = Application.builder().token(token).build()
-    application.add_handlers(MAIN_HANDLERS | PERMANENT_HANDLERS)
+
+    persistence = PicklePersistence(filepath='bot_data')
+    application = (Application.builder().token(token).
+        persistence(persistence).post_init(post_init).build())
+    application.add_handlers(main_handlers | permantent_handlers)
     bot_running = True
     application.run_polling()
