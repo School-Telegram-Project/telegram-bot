@@ -22,8 +22,6 @@ from telegram.error import Forbidden as Telegram_Forbidden
 
 import files
 import logs
-# from user import (User, VIEW_REPLACEMENTS, UPLOAD_REPLACEMENTS_FILE,
-#                   ENABLE_BOT, DISABLE_BOT, DOWNLOAD)
 
 from constants.main import *
 

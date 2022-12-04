@@ -15,12 +15,11 @@ from docx.table import _Cell, Table, _Row
 from docx.text.paragraph import Paragraph
 
 import logs
-from user import User
 
 from constants.files import *
 
 
-def find_user(telegram_id: int, phone_num = '') -> User:
+def find_user(telegram_id: int, phone_num = '') -> tuple:
     '''
     Finds user in database by phone number or Telegram ID
     Находит пользователя в базе данных по номеру телефона или ID Telegram'а
