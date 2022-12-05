@@ -31,19 +31,19 @@ def find_user(telegram_id: int, phone_num = '') -> tuple:
             # Find user by ID
             # Найти пользователя по ID
             query = (
-                    'SELECT DISTINCT\n'
-                    '\tname,\n'
-                    '\treplacer,\n'
-                    '\tscheduler,\n'
-                 #  '\tdispatcher,\n'
-                    '\tadmin\n'
-                    'FROM staff\n'
+                 'SELECT DISTINCT\n'
+                 '\tname,\n'
+                 '\treplacer,\n'
+                 '\tdispatcher,\n'
+                #  '\tscheduler,\n'
+                 '\tadmin\n'
+                 'FROM staff\n'
                 f'WHERE telegram_id = {telegram_id};'
             )
             cursor.execute(query)
             data = cursor.fetchall()
             if data:
-                return zip(USER_DATATYPES, data[0])
+                return tuple(zip(USER_DATATYPES, data[0]))
 
 
             # Find user by phone
@@ -56,8 +56,8 @@ def find_user(telegram_id: int, phone_num = '') -> tuple:
                  'SELECT DISTINCT\n'
                  '\tname,\n'
                  '\treplacer,\n'
-                 '\tscheduler,\n'
-                #  '\tdispatcher,\n'
+                 '\tdispatcher,\n'
+                #  '\tscheduler,\n'
                  '\tadmin,\n'
                  '\ttelegram_id\n'
                  'FROM staff\n'
@@ -75,7 +75,7 @@ def find_user(telegram_id: int, phone_num = '') -> tuple:
                 )
                 cursor.execute(query)
                 cursor.fetchall()
-            return zip(USER_DATATYPES, data[0][:-1])
+            return tuple(zip(USER_DATATYPES, data[0][:-1]))
     except sqlite3.Error as sql_error:
         logs.message(f'Error occured while searching for user {telegram_id}: {sql_error}')
 
