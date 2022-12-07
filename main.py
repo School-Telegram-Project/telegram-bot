@@ -4,13 +4,14 @@ Main module
 '''
 
 from datetime import datetime
+from collections.abc import Iterable
 import re
 # TODO: Локализация
 # import gettext
 from pathlib import Path
 from sys import argv, exit
 
-from telegram import (KeyboardButton, ReplyKeyboardMarkup,
+from telegram import (KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove,
                       InlineKeyboardButton, InlineKeyboardMarkup, Update)
 # from telegram.ext import (Application, ContextTypes, CommandHandler,
 #                           CallbackQueryHandler, MessageHandler, PicklePersistence)
@@ -24,6 +25,7 @@ import files
 import logs
 
 from constants.main import *
+from utils import value_in_dict, add_value
 
 
 application = None
@@ -87,17 +89,6 @@ def user_keyboard(user_data):
         ])
     return _keyboard
 
-def value_in_dict(value_type: str, array: dict, value = None) -> bool:
-    '''
-    Check if value type exists in dictionary
-    If value is set, checks if it is equal
-    Проверяет, есть ли тип значения в словаре
-    Если указано значение, проверяет, если это значение равно ему
-    '''
-    if value_type not in array:
-        return False
-    return (value is None) or (array[value_type] == value) or (value in array[value_type])
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, reset_user=False) -> None:
     '''
     Start command
@@ -117,7 +108,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, reset_user=F
             context.bot_data['users'].add(update.effective_chat.id)
             for datatype, value in user_data:
                 context.user_data[datatype] = value
-            context.user_data['id'] = update.effective_user.id
         else:
             keyboard = [ [KeyboardButton('Отправить номер', request_contact=True)] ]
             reply_markup = ReplyKeyboardMarkup(keyboard,
@@ -184,6 +174,7 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
         return
     logs.message(f'User {update.effective_user.id} was found by phone number')
+    add_value('users', update.effective_user.id, context.bot_data)
     if not value_in_dict('users', context.bot_data):
         context.bot_data['users'] = {update.effective_chat.id}
     else:
@@ -191,7 +182,10 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     for datatype, value in user_data:
         context.user_data[datatype] = value
     context.user_data['state'] = (0, 0)
-    persistence.flush()
+    await persistence.flush()
+    await context.bot.send_message(text=_('Пользовательские данные сохранены.'),
+                                   chat_id=update.effective_chat.id,
+                                   reply_markup=ReplyKeyboardRemove())
 
 async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
@@ -208,7 +202,7 @@ async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         text = _('Не удалось прочитать базу данных.')
         await context.bot.send_message(text=text, chat_id = update.effective_chat.id)
         return
-    if not replacements: # len(replacements) == 0
+    if not replacements:
         text = _('Замены на сегодня не найдены.')
         await context.bot.send_message(text=text, chat_id=update.effective_chat.id)
         return
@@ -229,10 +223,10 @@ async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         if i < len(replacements) - 1:
             text += '\n\n'
         date = datetime(*(int(s) for s in repl[3].split('.')))
-        try:
-            replacements_texts[date].append(text)
-        except AttributeError:
+        if date not in replacements_texts:
             replacements_texts[date] = [text]
+        else:
+            replacements_texts[date].append(text)
 
     for i, date in enumerate(replacements_texts):
         msg = ''
@@ -290,7 +284,7 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         _document = update.message.document
         logs.message(f'User {update.effective_user.id} has uploaded file "{_document.file_name}"')
         file_type = _document.file_name.split('.')[-1]
-        time = datetime.now().time().isoformat('seconds').replace(':', '.')
+        time = datetime.now().isoformat(sep='.', timespec='seconds').replace(':', '-')
         doc_file = await context.bot.get_file(_document.file_id)
         file_path = SELF_FOLDER / 'downloads' / f'{time}.{file_type}'
         await doc_file.download_to_drive(file_path)
