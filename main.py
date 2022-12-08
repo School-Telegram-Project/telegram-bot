@@ -3,28 +3,27 @@ Main module
 Основной модуль
 '''
 
-from datetime import datetime
 import re
+from collections.abc import Iterable
+from datetime import datetime
 # TODO: Локализация
 # import gettext
 from pathlib import Path
 from sys import argv, exit
 
-from telegram import (KeyboardButton, ReplyKeyboardMarkup,
-                      InlineKeyboardButton, InlineKeyboardMarkup, Update)
+from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
+                      KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove,
+                      Update)
+from telegram.error import Forbidden as Telegram_Forbidden
 # from telegram.ext import (Application, ContextTypes, CommandHandler,
 #                           CallbackQueryHandler, MessageHandler, PicklePersistence)
-from telegram.ext import (Application, ContextTypes, CommandHandler,
+from telegram.ext import (Application, CommandHandler, ContextTypes,
                           MessageHandler, PicklePersistence)
-
-
-from telegram.error import Forbidden as Telegram_Forbidden
 
 import files
 import logs
-
 from constants.main import *
-
+from utils import add_value, value_in_dict
 
 application = None
 persistence = None
@@ -72,14 +71,14 @@ def user_keyboard(user_data):
     Создать клавиатуру на основе данных пользователя (того, что он может сделать)
     '''
     _keyboard = []
-    if bot_running and 'replacer' in user_data and user_data['replacer']:
+    if bot_running and value_in_dict('replacer', user_data, 1):
         _keyboard.append([VIEW_REPLACEMENTS])
-    if bot_running and 'scheduler' in user_data and user_data['scheduler']:
+    if bot_running and value_in_dict('dispatcher', user_data, 1):
         # kb.append(['Добавить замены вручную', 'Загрузить файл замен'])
         _keyboard.append([UPLOAD_REPLACEMENTS_FILE])
-    # if bot_running and self.dispatcher:
+    # if bot_running and value_in_dict('scheduler', user_data, 1):
     #     kb.append(['Обновить расписание'])
-    if 'admin' in user_data and user_data['admin']:
+    if value_in_dict('admin', user_data, 1):
         _keyboard.extend([
             [DISABLE_BOT if bot_running else ENABLE_BOT]
             # [DOWNLOAD]
@@ -87,22 +86,16 @@ def user_keyboard(user_data):
         ])
     return _keyboard
 
-def auth(user_id: int, bot_data: dict) -> bool:
-    '''
-    Check if user is authorized
-    Проверить, авторизирован ли пользоваель
-    '''
-    return 'users' in bot_data and user_id in bot_data['users']
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, reset_user=False) -> None:
     '''
     Start command
     Команда старта
     '''
     # _ = get_translator(update.effective_user.language_code)
     _ = str
-    logs.message(f'User {update.effective_user.id} sended /start')
-    if not auth(update.effective_user.id, context.bot_data):
+    if not reset_user:
+        logs.message(f'User {update.effective_user.id} sended /start')
+    if reset_user or not value_in_dict('users', context.bot_data, update.effective_user.id):
         if 'users' not in context.bot_data:
             context.bot_data['users'] = set()
         logs.message(f'User {update.effective_chat.id} is not active user')
@@ -112,23 +105,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             context.bot_data['users'].add(update.effective_chat.id)
             for datatype, value in user_data:
                 context.user_data[datatype] = value
-            context.user_data['id'] = update.effective_user.id
         else:
             keyboard = [ [KeyboardButton('Отправить номер', request_contact=True)] ]
             reply_markup = ReplyKeyboardMarkup(keyboard,
                 resize_keyboard=True, one_time_keyboard=True)
-            text = _(
-                '<b>Здравствуйте!</b>\n'
-                'Я школьный чат-бот, созданный для отправки информации, '
-                'которая касается только Вас. Вы можете узнать о своих заменах'
-                'с моей помощью. Но перед работой мне нужно получить Ваш '
-                'номер, чтобы занести его в базу данных, пожалуйста, '
-                'подтвердите это действие, нажав на кнопку <i>Отправить номер</i> ниже.'
+            await update.message.reply_text(
+                text=_(
+                    '<b>Здравствуйте!</b>\n'
+                    'Я школьный чат-бот, созданный для отправки информации, '
+                    'которая касается только Вас. Вы можете узнать о своих заменах'
+                    'с моей помощью. Но перед работой мне нужно получить Ваш '
+                    'номер, чтобы занести его в базу данных, пожалуйста, '
+                    'подтвердите это действие, нажав на кнопку <i>Отправить номер</i> ниже.'
+                ),
+                parse_mode=HTML, reply_markup=reply_markup
             )
-            await update.message.reply_text(text=text, parse_mode=HTML, reply_markup=reply_markup)
             return
     context.user_data['state'] = (0, 0)
-    persistence.flush()
+    await persistence.flush()
     reply_markup = ReplyKeyboardMarkup(user_keyboard(context.user_data), resize_keyboard=True)
     text = _('Выберите действие с помощью кнопок...')
     await update.message.reply_text(text=text, reply_markup=reply_markup)
@@ -151,10 +145,12 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     # _ = get_translator(update.effective_user.language_code)
     _ = str
-    if not auth(update.effective_user.id, context.bot_data):
+    if not value_in_dict('users', context.bot_data, update.effective_user.id):
         return
+    logs.message(f'User {update.effective_user.id} sended /reset')
+    context.bot_data['users'].remove(update.effective_user.id)
     context.user_data.clear()
-    await start(update, context)
+    await start(update, context, reset_user=True)
 
 async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
@@ -177,22 +173,26 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
         return
     logs.message(f'User {update.effective_user.id} was found by phone number')
-    if 'users' not in context.bot_data:
+    add_value('users', update.effective_user.id, context.bot_data)
+    if not value_in_dict('users', context.bot_data):
         context.bot_data['users'] = {update.effective_chat.id}
     else:
         context.bot_data['users'].add(update.effective_chat.id)
     for datatype, value in user_data:
         context.user_data[datatype] = value
-    context.user_data['id'] = update.effective_user.id
     context.user_data['state'] = (0, 0)
-    persistence.flush()
+    await persistence.flush()
+    await context.bot.send_message(
+        text=_('Пользовательские данные сохранены.'),
+        chat_id=update.effective_chat.id, reply_markup=ReplyKeyboardRemove()
+    )
 
 async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Look for replacements that involve user
     Поиск замен для пользователя
     '''
-    if not auth(update.effective_user.id, context.bot_data):
+    if not value_in_dict('replacer', context.user_data, 1):
         return
     # _ = get_translator(update.effective_user.language_code)
     _ = str
@@ -202,26 +202,26 @@ async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         text = _('Не удалось прочитать базу данных.')
         await context.bot.send_message(text=text, chat_id = update.effective_chat.id)
         return
-    if not replacements: # len(replacements) == 0
+    if not replacements:
         text = _('Замены на сегодня не найдены.')
         await context.bot.send_message(text=text, chat_id=update.effective_chat.id)
         return
 
     replacements_texts = {}
     for i, repl in enumerate(replacements):
-        # class, teacher, lesson, lesson_date, class_group, room, replaced_teacher
+        # teacher, class, lesson, lesson_date, room, replaced, additional
         text = _(
-            'Замена у {class_name} класса на {lesson_num} уроке'
-            '{room}'        # в {room} кабинете
-            '{group}'     # у {group} группы
+            'Замена у {class_name} класса на {lesson} уроке'
+            '{room}'            # в {room} кабинете
+            # '{teacher}'         # у {teacher} учителя
+            '{additional}'      # (доп. информация)
             ).format(
-                class_name = repl[0],
-                lesson_num = repl[2],
-                room = ' ' + _('в кабинете {0}').format(repl[5]) if repl[5] != 'NULL' else '',
-                group = ' ' + _('у {0} группы').format(repl[4]) if repl[4] != 0 else ''
+                class_name = repl[1],
+                lesson = repl[2],
+                room = ' ' + _('в кабинете {0}').format(repl[4]) if repl[4] is not None else '',
+                # teacher = repl[5],
+                additional = f'\n{repl[6]}' if repl[6] is not None else ''
             )
-        if i < len(replacements) - 1:
-            text += '\n\n'
         date = datetime(*(int(s) for s in repl[3].split('.')))
         if date not in replacements_texts:
             replacements_texts[date] = [text]
@@ -231,22 +231,21 @@ async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     for i, date in enumerate(replacements_texts):
         msg = ''
         texts = replacements_texts[date]
-        if (datetime.now() - date).days > 0:
-            msg += _('Замены на сегодня:')
-        else:
-            msg += _('Замены на {d}.{m}.{y}:').format(
-                d = date.day,
-                m = date.month,
-                y = date.year
-            )
+        msg += _('Замены на {d}.{m}.{y}:').format(
+            d = date.day,
+            m = date.month,
+            y = date.year
+        )
         msg += HORIZONTAL_BAR
-        for t in texts:
-            if len(msg) + len(t) > MAX_TEXT_LENGTH:
-                await context.bot.send_message(text=msg, chat_id=update.effective_chat.id,
-                                               parse_mode=HTML)
+        texts_end = len(texts) - 1
+        for i, t in enumerate(texts):
+            if len(msg) + len(t) + (2 if i < texts_end else 0) > MAX_TEXT_LENGTH:
+                await context.bot.send_message(
+                    text=msg, chat_id=update.effective_chat.id, parse_mode=HTML
+                )
                 msg = ''
             else:
-                msg += t
+                msg += t + ('\n\n' if i < texts_end else '')
         msg += HORIZONTAL_BAR
         await context.bot.send_message(text=msg, chat_id=update.effective_chat.id, parse_mode=HTML)
 
@@ -255,7 +254,7 @@ async def upload_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE
     Upload replacements table
     Загрузить таблицу замен
     '''
-    if not auth(update.effective_user.id, context.bot_data):
+    if not value_in_dict('dispatcher', context.user_data, value=1):
         return
     # _ = get_translator(update.effective_user.language_code)
     _ = str
@@ -276,30 +275,39 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     Downloading files
     Получение файла
     '''
-    if not auth(update.effective_user.id, context.bot_data):
+    if not value_in_dict('dispatcher', context.user_data, 1):
         return
-    if context.user_data['state'] in [1, 2]:
+    if context.user_data['state'][0] in [1, 2]:
         # _ = get_translator(update.effective_user.language_code)
         _ = str
         _document = update.message.document
         logs.message(f'User {update.effective_user.id} has uploaded file "{_document.file_name}"')
         file_type = _document.file_name.split('.')[-1]
-        time = datetime.now().time().isoformat('seconds').replace(':', '.')
+        time = datetime.now().isoformat(sep='.', timespec='seconds').replace(':', '-')
         doc_file = await context.bot.get_file(_document.file_id)
         file_path = SELF_FOLDER / 'downloads' / f'{time}.{file_type}'
         await doc_file.download_to_drive(file_path)
         if context.user_data['state'][0] == 1:
-            teachers, data = files.replacements_from_file(file_path)
-            to_save = len(data)
-            saved = files.save_replacement(data)
+            await context.bot.send_message(
+                text=_('Идёт обработка файла, пожалуйста, подождите...'),
+                chat_id=update.effective_chat.id
+            )
+            replacements = files.replacements_from_file(file_path)
+            to_save = len(replacements)
+            saved = files.save_replacement(replacements)
             text = _('! <b>У вас есть новые замены</b> !')
-            reply_markup = ReplyKeyboardMarkup(user_keyboard(context.user_data),
-                                               resize_keyboard=True)
-            for __, usr_id in enumerate(application.user_data):
-                usr = application.user_data[usr_id]
-                if usr['name'] in teachers and usr_id != update.effective_user.id:
-                    await context.bot.send_message(chat_id=usr_id, text=text,
-                                                   parse_mode=HTML, reply_markup=reply_markup)
+            for user_id in context.bot_data['users']:
+                user_data = application.user_data[user_id]
+                if user_data['name'] in replacements and user_id != update.effective_user.id:
+                    reply_markup = ReplyKeyboardMarkup(user_keyboard(user_data),
+                                                       resize_keyboard=True)
+                    try:
+                        await context.bot.send_message(
+                            chat_id=user_id, text=text, parse_mode=HTML, reply_markup=reply_markup
+                        )
+                    except Telegram_Forbidden:
+                        context.bot_data['users'].remove(user_id)
+                        del application.user_data[user_id]
             if saved < to_save:
                 text = _('Возникла проблема с сохранением данных, '
                         f'загружено {saved} из {to_save} замен.')
@@ -315,7 +323,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     Handles InlineKeyboard presses
     Обрабатывает нажатия InlineKeyboard
     '''
-    if not auth(update.effective_user.id, context.bot_data):
+    if not value_in_dict('users', context.bot_data, update.effective_user.id):
         return
     query = update.callback_query
     data = query.data
@@ -344,7 +352,7 @@ async def enable_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     Enable bot for non-admin users by adding main handlers
     Включить бота для не-администаторов, добавив основные обработчики комманд
     '''
-    if not auth(update.effective_user.id, context.bot_data) or not context.user_data['admin']:
+    if not value_in_dict('admin', context.user_data, 1):
         return
     # _ = get_translator(update.effective_user.language_code)
     _ = str
@@ -366,7 +374,7 @@ async def disable_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     Disable bot for non-admin users by removing main handlers
     Выключить бота для не-адмнинстраторов, убрав основные обработчики комманд
     '''
-    if not auth(update.effective_user.id, context.bot_data) or not context.user_data['admin']:
+    if not value_in_dict('admin', context.user_data, 1):
         return
     # _ = get_translator(update.effective_user.language_code)
     _ = str
@@ -392,7 +400,7 @@ async def post_init(app: Application) -> None:
     if app.bot_data is not None and 'users' in app.bot_data:
         for user_id in app.bot_data['users']:
             try:
-                app.bot.get_chat(user_id)
+                await app.bot.get_chat(user_id)
             except Telegram_Forbidden:
                 app.bot_data['users'].remove(user_id)
 
