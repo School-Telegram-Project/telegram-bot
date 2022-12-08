@@ -5,12 +5,12 @@ All constats for files.py
 
 __all__ = (
     'NULL',
-    'REPLACED_TEACHER',
     'REPLACING_TEACHER',
     'LESSON',
     'CLASS_NAME',
     'ROOM',
-    'NECCESERY_VALUES',
+    'REPLACEMENT_NECCESSARY_TYPES',
+    'REPLACEMENT_DATATYPES',
     'DATE_PATTERN',
     'MONTHS',
     'TEACHER_PATTERN',
@@ -26,12 +26,12 @@ NULL = "NULL"
 
 # Table headers
 # Заголовки таблицы
-REPLACED_TEACHER = 'заменённый учитель'
 REPLACING_TEACHER = 'заменяющий учитель'
 LESSON = '№ урока'
 CLASS_NAME = 'класс'
 ROOM = 'кабинет'
-NECCESERY_VALUES = (REPLACING_TEACHER, LESSON, CLASS_NAME)
+REPLACEMENT_NECCESSARY_TYPES = (REPLACING_TEACHER, LESSON, CLASS_NAME)
+REPLACEMENT_DATATYPES = (*REPLACEMENT_NECCESSARY_TYPES, ROOM)
 
 # Date constants
 # Константы дат

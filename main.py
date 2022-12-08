@@ -3,30 +3,27 @@ Main module
 Основной модуль
 '''
 
-from datetime import datetime
-from collections.abc import Iterable
 import re
+from collections.abc import Iterable
+from datetime import datetime
 # TODO: Локализация
 # import gettext
 from pathlib import Path
 from sys import argv, exit
 
-from telegram import (KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove,
-                      InlineKeyboardButton, InlineKeyboardMarkup, Update)
+from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
+                      KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove,
+                      Update)
+from telegram.error import Forbidden as Telegram_Forbidden
 # from telegram.ext import (Application, ContextTypes, CommandHandler,
 #                           CallbackQueryHandler, MessageHandler, PicklePersistence)
-from telegram.ext import (Application, ContextTypes, CommandHandler,
+from telegram.ext import (Application, CommandHandler, ContextTypes,
                           MessageHandler, PicklePersistence)
-
-
-from telegram.error import Forbidden as Telegram_Forbidden
 
 import files
 import logs
-
 from constants.main import *
-from utils import value_in_dict, add_value
-
+from utils import add_value, value_in_dict
 
 application = None
 persistence = None
@@ -112,15 +109,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, reset_user=F
             keyboard = [ [KeyboardButton('Отправить номер', request_contact=True)] ]
             reply_markup = ReplyKeyboardMarkup(keyboard,
                 resize_keyboard=True, one_time_keyboard=True)
-            text = _(
-                '<b>Здравствуйте!</b>\n'
-                'Я школьный чат-бот, созданный для отправки информации, '
-                'которая касается только Вас. Вы можете узнать о своих заменах'
-                'с моей помощью. Но перед работой мне нужно получить Ваш '
-                'номер, чтобы занести его в базу данных, пожалуйста, '
-                'подтвердите это действие, нажав на кнопку <i>Отправить номер</i> ниже.'
+            await update.message.reply_text(
+                text=_(
+                    '<b>Здравствуйте!</b>\n'
+                    'Я школьный чат-бот, созданный для отправки информации, '
+                    'которая касается только Вас. Вы можете узнать о своих заменах'
+                    'с моей помощью. Но перед работой мне нужно получить Ваш '
+                    'номер, чтобы занести его в базу данных, пожалуйста, '
+                    'подтвердите это действие, нажав на кнопку <i>Отправить номер</i> ниже.'
+                ),
+                parse_mode=HTML, reply_markup=reply_markup
             )
-            await update.message.reply_text(text=text, parse_mode=HTML, reply_markup=reply_markup)
             return
     context.user_data['state'] = (0, 0)
     await persistence.flush()
@@ -183,9 +182,10 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         context.user_data[datatype] = value
     context.user_data['state'] = (0, 0)
     await persistence.flush()
-    await context.bot.send_message(text=_('Пользовательские данные сохранены.'),
-                                   chat_id=update.effective_chat.id,
-                                   reply_markup=ReplyKeyboardRemove())
+    await context.bot.send_message(
+        text=_('Пользовательские данные сохранены.'),
+        chat_id=update.effective_chat.id, reply_markup=ReplyKeyboardRemove()
+    )
 
 async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
@@ -209,19 +209,19 @@ async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     replacements_texts = {}
     for i, repl in enumerate(replacements):
-        # class, teacher, lesson, lesson_date, class_group, room, replaced_teacher
+        # teacher, class, lesson, lesson_date, room, replaced, additional
         text = _(
-            'Замена у {class_name} класса на {lesson_num} уроке'
-            '{room}'        # в {room} кабинете
-            '{group}'     # у {group} группы
+            'Замена у {class_name} класса на {lesson} уроке'
+            '{room}'            # в {room} кабинете
+            # '{teacher}'         # у {teacher} учителя
+            '{additional}'      # (доп. информация)
             ).format(
-                class_name = repl[0],
-                lesson_num = repl[2],
-                room = ' ' + _('в кабинете {0}').format(repl[5]) if repl[5] != 'NULL' else '',
-                group = ' ' + _('у {0} группы').format(repl[4]) if repl[4] != 0 else ''
+                class_name = repl[1],
+                lesson = repl[2],
+                room = ' ' + _('в кабинете {0}').format(repl[4]) if repl[4] is not None else '',
+                # teacher = repl[5],
+                additional = f'\n{repl[6]}' if repl[6] is not None else ''
             )
-        if i < len(replacements) - 1:
-            text += '\n\n'
         date = datetime(*(int(s) for s in repl[3].split('.')))
         if date not in replacements_texts:
             replacements_texts[date] = [text]
@@ -231,22 +231,21 @@ async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     for i, date in enumerate(replacements_texts):
         msg = ''
         texts = replacements_texts[date]
-        if (datetime.now() - date).days > 0:
-            msg += _('Замены на сегодня:')
-        else:
-            msg += _('Замены на {d}.{m}.{y}:').format(
-                d = date.day,
-                m = date.month,
-                y = date.year
-            )
+        msg += _('Замены на {d}.{m}.{y}:').format(
+            d = date.day,
+            m = date.month,
+            y = date.year
+        )
         msg += HORIZONTAL_BAR
-        for t in texts:
-            if len(msg) + len(t) > MAX_TEXT_LENGTH:
-                await context.bot.send_message(text=msg, chat_id=update.effective_chat.id,
-                                               parse_mode=HTML)
+        texts_end = len(texts) - 1
+        for i, t in enumerate(texts):
+            if len(msg) + len(t) + (2 if i < texts_end else 0) > MAX_TEXT_LENGTH:
+                await context.bot.send_message(
+                    text=msg, chat_id=update.effective_chat.id, parse_mode=HTML
+                )
                 msg = ''
             else:
-                msg += t
+                msg += t + ('\n\n' if i < texts_end else '')
         msg += HORIZONTAL_BAR
         await context.bot.send_message(text=msg, chat_id=update.effective_chat.id, parse_mode=HTML)
 
@@ -289,18 +288,23 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         file_path = SELF_FOLDER / 'downloads' / f'{time}.{file_type}'
         await doc_file.download_to_drive(file_path)
         if context.user_data['state'][0] == 1:
-            teachers, data = files.replacements_from_file(file_path)
-            to_save = len(data)
-            saved = files.save_replacement(data)
+            await context.bot.send_message(
+                text=_('Идёт обработка файла, пожалуйста, подождите...'),
+                chat_id=update.effective_chat.id
+            )
+            replacements = files.replacements_from_file(file_path)
+            to_save = len(replacements)
+            saved = files.save_replacement(replacements)
             text = _('! <b>У вас есть новые замены</b> !')
             for user_id in context.bot_data['users']:
                 user_data = application.user_data[user_id]
-                if user_data['name'] in teachers and user_id != update.effective_user.id:
+                if user_data['name'] in replacements and user_id != update.effective_user.id:
                     reply_markup = ReplyKeyboardMarkup(user_keyboard(user_data),
-                                                        resize_keyboard=True)
+                                                       resize_keyboard=True)
                     try:
-                        await context.bot.send_message(chat_id=user_id, text=text,
-                                                        parse_mode=HTML, reply_markup=reply_markup)
+                        await context.bot.send_message(
+                            chat_id=user_id, text=text, parse_mode=HTML, reply_markup=reply_markup
+                        )
                     except Telegram_Forbidden:
                         context.bot_data['users'].remove(user_id)
                         del application.user_data[user_id]

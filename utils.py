@@ -29,14 +29,15 @@ def add_value(key, value, dictionary: dict) -> None:
     Добавить значение `value` к `dictionary[key]`
     '''
     if key in dictionary:
-        if isinstance(dictionary[key], list):
-            if isinstance(value, Iterable):
-                dictionary[key].extend(value)
-            else:
-                dictionary[key].append(value)
-        elif isinstance(dictionary[key], set):
-            dictionary[key].add(value)
-        else:
-            dictionary[key] += value
+        match dictionary[key]:
+            case list():
+                if isinstance(value, Iterable):
+                    dictionary[key].extend(value)
+                else:
+                    dictionary[key].append(value)
+            case set():
+                dictionary[key].add(value)
+            case _:
+                dictionary[key] += value
     else:
         dictionary[key] = value

@@ -3,20 +3,19 @@ File operation module
 Модуль операций с файлами
 '''
 
-import sqlite3
 import re
+import sqlite3
 from collections.abc import Generator
 from datetime import datetime
 
 from docx import Document
 from docx.document import Document as _Document
-from docx.oxml.text.paragraph import CT_P
 from docx.oxml.table import CT_Tbl
-from docx.table import _Cell, Table, _Row
+from docx.oxml.text.paragraph import CT_P
+from docx.table import Table, _Cell, _Row
 from docx.text.paragraph import Paragraph
 
 import logs
-
 from constants.files import *
 from replacements import Replacement
 from utils import add_value
@@ -206,22 +205,26 @@ def replacements_from_file(file_path: str) -> tuple:
             collumns = []
             for i, cell in enumerate(block.rows[0].cells):
                 text = cell.text.lower().strip()
-                if text in NECCESERY_VALUES:
+                if text in REPLACEMENT_DATATYPES:
                     collumns.append((i, text))
 
             for row in block.rows[1:]:
                 data = {}
                 for i, header in collumns:
-                    text = row.cells[i].text.lower().strip()
+                    if i >= len(row.cells):
+                        break
+                    text = row.cells[i].text.strip()
                     if text != '':
                         data[header] = text
-                if any(datatype not in data for datatype in NECCESERY_VALUES):
+                if any(datatype not in data for datatype in REPLACEMENT_NECCESSARY_TYPES):
+                    continue
+                teacher_data = teacher_parse(data[REPLACING_TEACHER])
+                if teacher_data is None:
                     continue
                 add_value(
                     key=teacher_data[0],
                     value=[Replacement(
                         replaced_teacher = replaced_teacher,
-                        replacing_teacher = teacher_data[0],
                         lesson = data[LESSON],
                         class_name = data[CLASS_NAME],
                         date = date,
@@ -238,16 +241,16 @@ def replacements_generator(data: dict) -> Generator:
     Returns generator of 1-dimensional array from dictionary {date: replacements}
     Возвращает генератор 1-мерного массива из словаря {дата: замены}
     '''
-    for _, date in enumerate(data):
-        for _, values in enumerate(data[date]):
+    for _, teacher in enumerate(data):
+        for __, repl in enumerate(data[teacher]):
             yield (
-                values['Класс'],
-                values['Заменяющий учитель'],
-                values['№ урока'],
-                date,
-                values['Группа'],
-                values['Кабинет'] if values['Кабинет'] != '' else NULL,
-                values['Заменённый учитель']
+                teacher,
+                repl.class_name,
+                repl.lesson,
+                f'{repl.date.year}.{repl.date.month}.{repl.date.day}',
+                repl.room if repl.room != '' else NULL,
+                repl.replaced_teacher if repl.replaced_teacher != '' else NULL,
+                repl.additional
             )
 
 # def _save_replacement(data: list, mode = 0) -> int:
@@ -264,14 +267,15 @@ def save_replacement(data: list) -> int:
             query = (
                 "BEGIN;\n"
                 "CREATE TABLE IF NOT EXISTS replacements (\n"
-                "    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,\n"
-                "    class TEXT NOT NULL,\n"
+                "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
                 "    teacher TEXT NOT NULL,\n"
+                "    class TEXT NOT NULL,\n"
                 "    lesson INTEGER NOT NULL,\n"
                 "    lesson_date TEXT NOT NULL,\n"
-                "    class_group INTEGER,\n"
                 "    room TEXT,\n"
-                "  replaced_teacher TEXT);\n"
+                "    replaced TEXT,\n"
+                "    additional TEXT\n"
+                ");\n"
                 "DELETE FROM replacements;\n"
                 "DELETE FROM sqlite_sequence WHERE name='replacements';\n"
                 "COMMIT;"
@@ -282,7 +286,7 @@ def save_replacement(data: list) -> int:
 
             cursor.executemany(
                 "INSERT INTO replacements "
-                "(class,teacher,lesson,lesson_date,class_group,room,replaced_teacher)\n"
+                "(teacher, class, lesson, lesson_date, room, replaced, additional)\n"
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 replacements_generator(data)
             )
@@ -303,12 +307,12 @@ def read_replacements(teacher: str) -> list:
         with sqlite3.connect('database') as connection:
             cursor = connection.cursor()
             select_query = (
-                 "SELECT class, teacher, lesson, lesson_date, class_group, room, replaced_teacher\n"
-                 "FROM replacements\n"
-                f"WHERE teacher = '{teacher}'\n"
-                 "ORDER BY lesson_date;"
+                "SELECT teacher, class, lesson, lesson_date, room, replaced, additional\n"
+                "FROM replacements\n"
+                "WHERE teacher = ?\n"
+                "ORDER BY lesson_date;"
             )
-            cursor.execute(select_query)
+            cursor.execute(select_query, [teacher])
             rows = cursor.fetchall()
         return rows
     except sqlite3.Error as error:

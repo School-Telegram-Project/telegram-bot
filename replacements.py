@@ -5,6 +5,7 @@ Module for working with replacements
 from dataclasses import dataclass, field
 from datetime import datetime
 
+
 @dataclass()
 class Replacement:
     '''
@@ -19,27 +20,10 @@ class Replacement:
     room = ''
     additional: tuple = field(default_factory=tuple)
 
-    def __init__(self, replaced_teacher, replacing_teacher,
-                 lesson, class_name, date, room, additional):
+    def __init__(self, replaced_teacher, lesson, class_name, date, room, additional):
         self.replaced_teacher = replaced_teacher
-        self.replacing_teacher = replacing_teacher
         self.lesson = lesson
         self.class_name = class_name
         self.date = date
         self.room = room
         self.additional = additional
-
-    def as_tuple(self) -> tuple:
-        '''
-        Return properties in a tuple
-        Возвращает свойства в списке
-        '''
-        return (
-            self.replaced_teacher,
-            self.replacing_teacher,
-            self.lesson,
-            self.class_name,
-            self.date,
-            self.room,
-            self.additional
-        )
