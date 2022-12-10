@@ -179,7 +179,7 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await persistence.flush()
     await context.bot.send_message(
         text=_('Пользовательские данные сохранены.'),
-        chat_id=update.effective_chat.id, reply_markup=ReplyKeyboardRemove()
+        chat_id=update.effective_chat.id, reply_markup=user_keyboard(context.user_data)
     )
 
 async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -341,7 +341,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def enable_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Enable bot for non-admin users by adding main handlers
-    Включить бота для не-администраторов, добавив основные обработчики команд
+    Включить бот для не-администраторов, добавив основные обработчики команд
     '''
     if not value_in_dict('admin', context.user_data, 1):
         return
@@ -362,7 +362,7 @@ async def enable_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 async def disable_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Disable bot for non-admin users by removing main handlers
-    Выключить бота для не-администраторов, убрав основные обработчики команд
+    Выключить бот для не-администраторов, убрав основные обработчики команд
     '''
     if not value_in_dict('admin', context.user_data, 1):
         return
