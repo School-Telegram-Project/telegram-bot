@@ -1,5 +1,5 @@
 '''
-All constats for files.py
+All constants for files.py
 Все константы для files.py
 '''
 
@@ -9,7 +9,7 @@ __all__ = (
     'LESSON',
     'CLASS_NAME',
     'ROOM',
-    'REPLACEMENT_NECCESSARY_TYPES',
+    'REPLACEMENT_NECESSARY_TYPES',
     'REPLACEMENT_DATATYPES',
     'DATE_PATTERN',
     'MONTHS',
@@ -30,8 +30,8 @@ REPLACING_TEACHER = 'заменяющий учитель'
 LESSON = '№ урока'
 CLASS_NAME = 'класс'
 ROOM = 'кабинет'
-REPLACEMENT_NECCESSARY_TYPES = (REPLACING_TEACHER, LESSON, CLASS_NAME)
-REPLACEMENT_DATATYPES = (*REPLACEMENT_NECCESSARY_TYPES, ROOM)
+REPLACEMENT_NECESSARY_TYPES = (REPLACING_TEACHER, LESSON, CLASS_NAME)
+REPLACEMENT_DATATYPES = (*REPLACEMENT_NECESSARY_TYPES, ROOM)
 
 # Date constants
 # Константы дат
@@ -68,6 +68,6 @@ ADDITIONAL_PATTERN = r'\(+[\w\s]+\)+'
 # )
 
 # User data constants
-# Констатны, связанные с данными пользователей
+# Константы, связанные с данными пользователей
 # USER_DATATYPES = ('name', 'replacer', 'scheduler', 'dispatcher', 'admin')
 USER_DATATYPES = ('name', 'replacer', 'dispatcher', 'admin')

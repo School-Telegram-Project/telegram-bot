@@ -79,7 +79,7 @@ def find_user(telegram_id: int, phone_num = '') -> tuple:
                 cursor.fetchall()
             return tuple(zip(USER_DATATYPES, data[0][:-1]))
     except sqlite3.Error as sql_error:
-        logs.message(f'Error occured while searching for user {telegram_id}: {sql_error}')
+        logs.message(f'Error occurred while searching for user {telegram_id}: {sql_error}')
 
 # def add_user(data: tuple) -> int:
 #     '''
@@ -104,7 +104,7 @@ def find_user(telegram_id: int, phone_num = '') -> tuple:
 #             row = cursor.fetchall()
 #             return bool(row)
 #     except sqlite3.Error as sql_error:
-#         logs.message(f'Error occured while adding user to database: {sql_error}')
+#         logs.message(f'Error occurred while adding user to database: {sql_error}')
 #         return -1
 
 # def save_replacements(file: str, mode = 0) -> int:
@@ -202,21 +202,21 @@ def replacements_from_file(file_path: str) -> tuple:
         elif isinstance(block, Table):
             if date is None or replaced_teacher == '' or len(block.rows) < 2:
                 continue
-            collumns = []
+            columns = []
             for i, cell in enumerate(block.rows[0].cells):
                 text = cell.text.lower().strip()
                 if text in REPLACEMENT_DATATYPES:
-                    collumns.append((i, text))
+                    columns.append((i, text))
 
             for row in block.rows[1:]:
                 data = {}
-                for i, header in collumns:
+                for i, header in columns:
                     if i >= len(row.cells):
                         break
                     text = row.cells[i].text.strip()
                     if text != '':
                         data[header] = text
-                if any(datatype not in data for datatype in REPLACEMENT_NECCESSARY_TYPES):
+                if any(datatype not in data for datatype in REPLACEMENT_NECESSARY_TYPES):
                     continue
                 teacher_data = teacher_parse(data[REPLACING_TEACHER])
                 if teacher_data is None:
