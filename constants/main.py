@@ -37,8 +37,8 @@ SELF_FOLDER = None
 # Сообщения-команды
 VIEW_REPLACEMENTS = 'Посмотреть мои замены'
 UPLOAD_REPLACEMENTS_FILE = 'Загрузить файл замен'
-ENABLE_BOT = 'Запустить бота'
-DISABLE_BOT = 'Выключить бота'
+ENABLE_BOT = 'Запустить бот'
+DISABLE_BOT = 'Выключить бот'
 # DOWNLOAD = 'Скачать последний лог-файл'
 # ADD_USER = 'Добавить нового пользователя'
 # DELETE_USER = 'Удалить пользователя'

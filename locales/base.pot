@@ -1,0 +1,130 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-12-10 20:09+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: main.py:114
+# Starting message
+msgid ""
+"<b>Здравствуйте!</b>\n"
+"Я школьный чат-бот, созданный для отправки информации, которая касается "
+"только Вас. Вы можете узнать о своих заменах моей помощью. Но перед работой "
+"мне нужно получить Ваш номер, чтобы занести его в базу данных, пожалуйста, "
+"подтвердите это действие, нажав на кнопку <i>Отправить номер</i> ниже."
+msgstr ""
+
+#: main.py:127
+# Select action via button
+msgid "Выберите действие с помощью кнопок..."
+msgstr ""
+
+#: main.py:137
+# Help menu
+msgid ""
+"Используйте команду <i>/start</i> для начала работы с ботом.\n"
+"Используйте клавиатуру команд для выбора действия и следуйте инструкциям."
+msgstr ""
+
+#: main.py:164
+# Somebody's else contact was sended
+msgid "Пожалуйста, отправьте <b>свой</b> контакт."
+msgstr ""
+
+#: main.py:171
+# User data not found
+msgid ""
+"Вы отсутствуете среди списка пользователей.\n"
+"Пожалуйста, обратитесь к администрации."
+msgstr ""
+
+#: main.py:186
+# User data found 
+msgid "Пользовательские данные сохранены."
+msgstr ""
+
+#: main.py:202
+# Couldn't read database
+msgid "Не удалось прочитать базу данных."
+msgstr ""
+
+#: main.py:206
+# No replacements found
+msgid "Замены не найдены."
+msgstr ""
+
+#: main.py:214
+#, python-brace-format
+# Replacement for <class_name> class on <lesson>('th) lesson (+ extra information)
+msgid "Замена у {class_name} класса на {lesson} уроке{room}{additional}"
+msgstr ""
+
+#: main.py:221
+#, python-brace-format
+# (Lesson is) in {0} room
+msgid "в кабинете {0}"
+msgstr ""
+
+#: main.py:234
+#, python-brace-format
+# Replacements for DD.MM.YYYY
+msgid "Замены на {d}.{m}.{y}:"
+msgstr ""
+
+#: main.py:268
+# Replacements file request
+msgid "Пожалуйста, загрузите таблицу замен."
+msgstr ""
+
+#: main.py:292
+# Currently working
+msgid "Идёт обработка файла, пожалуйста, подождите..."
+msgstr ""
+
+#: main.py:298
+# New replacements
+msgid "! <b>У вас есть новые замены</b> !"
+msgstr ""
+
+#: main.py:312
+# Error occurred while saving data
+msgid "Возникла проблема с сохранением данных, "
+msgstr ""
+
+#: main.py:315
+# Data successfully saved
+msgid "Данные сохранены."
+msgstr ""
+
+#: main.py:362
+# Bot is already running
+msgid "Бот уже запущен."
+msgstr ""
+
+#: main.py:368
+# Bot was successfully launched
+msgid "Бот успешно запущен."
+msgstr ""
+
+#: main.py:385
+# Bot is already stopped
+msgid "Бот уже выключен."
+msgstr ""
+
+#: main.py:392
+# Bot was successfully stopped
+msgid "Бот успешно выключен."
+msgstr ""

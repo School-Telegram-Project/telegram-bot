@@ -3,11 +3,10 @@ Main module
 Основной модуль
 '''
 
+import gettext
 import re
 from collections.abc import Iterable
 from datetime import datetime
-# TODO: Локализация
-# import gettext
 from pathlib import Path
 from sys import argv, exit
 
@@ -29,15 +28,15 @@ application = None
 persistence = None
 bot_running = False
 main_handlers = None
-permantent_handlers = None
+permanent_handlers = None
 
-# def get_translator(lang: str = 'ru'):
-#     '''
-#     Find translation for user
-#     Найти перевод для пользователя
-#     '''
-#     trans = gettext.translation('', localedir=SELF_PATH/'locale', languages=(lang,))
-#     return trans.gettext
+def get_translator(lang: str = 'ru'):
+    '''
+    Find translation for user
+    Найти перевод для пользователя
+    '''
+    trans = gettext.translation('base', localedir=SELF_FOLDER / 'locales', languages=[lang])
+    return trans.gettext
 
 
 # def new_user(data: tuple) -> int:
@@ -61,7 +60,7 @@ permantent_handlers = None
 #     elif result == 0:
 #         text = f'Tried to add user {data[0]} (id={data[1]}), who is already in database'
 #     else:
-#         text = f'Error happend when trying to add new user {data[0]}'
+#         text = f'Error happened when trying to add new user {data[0]}'
 #     logs.message(text, level=1)
 #     return result
 
@@ -91,8 +90,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, reset_user=F
     Start command
     Команда старта
     '''
-    # _ = get_translator(update.effective_user.language_code)
-    _ = str
+    _ = get_translator(update.effective_user.language_code)
     if not reset_user:
         logs.message(f'User {update.effective_user.id} sended /start')
     if reset_user or not value_in_dict('users', context.bot_data, update.effective_user.id):
@@ -132,10 +130,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     Help menu
     Меню помощи
     '''
-    # _ = get_translator(update.effective_user.language_code)
-    _ = str
+    _ = get_translator(update.effective_user.language_code)
     text = _('Используйте команду <i>/start</i> для начала работы с ботом.\n'
-             'Используйте клавиатуру команд для выбора действия и сделуйте инструкциям.')
+             'Используйте клавиатуру команд для выбора действия и сделайте инструкциям.')
     await context.bot.send_message(text=text, chat_id=update.effective_chat.id, parse_mode=HTML)
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -143,8 +140,7 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     Reset user's status
     Сбрасывает статус пользователя
     '''
-    # _ = get_translator(update.effective_user.language_code)
-    _ = str
+    _ = get_translator(update.effective_user.language_code)
     if not value_in_dict('users', context.bot_data, update.effective_user.id):
         return
     logs.message(f'User {update.effective_user.id} sended /reset')
@@ -157,8 +153,7 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     Contact message
     Сообщение с контактом
     '''
-    # _ = get_translator(update.effective_user.language_code)
-    _ = str
+    _ = get_translator(update.effective_user.language_code)
     _contact = update.effective_message.contact
     if update.effective_user.id != _contact.user_id:
         await context.bot.send_message(text=_('Пожалуйста, отправьте <b>свой</b> контакт.'),
@@ -184,7 +179,7 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await persistence.flush()
     await context.bot.send_message(
         text=_('Пользовательские данные сохранены.'),
-        chat_id=update.effective_chat.id, reply_markup=ReplyKeyboardRemove()
+        chat_id=update.effective_chat.id, reply_markup=user_keyboard(context.user_data)
     )
 
 async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -194,8 +189,7 @@ async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     '''
     if not value_in_dict('replacer', context.user_data, 1):
         return
-    # _ = get_translator(update.effective_user.language_code)
-    _ = str
+    _ = get_translator(update.effective_user.language_code)
     logs.message(f'User {update.effective_user.id} has requested their replacements')
     replacements = files.read_replacements(context.user_data['name'])
     if replacements is None:
@@ -203,7 +197,7 @@ async def view_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await context.bot.send_message(text=text, chat_id = update.effective_chat.id)
         return
     if not replacements:
-        text = _('Замены на сегодня не найдены.')
+        text = _('Замены не найдены.')
         await context.bot.send_message(text=text, chat_id=update.effective_chat.id)
         return
 
@@ -256,8 +250,7 @@ async def upload_replacements(update: Update, context: ContextTypes.DEFAULT_TYPE
     '''
     if not value_in_dict('dispatcher', context.user_data, value=1):
         return
-    # _ = get_translator(update.effective_user.language_code)
-    _ = str
+    _ = get_translator(update.effective_user.language_code)
     # keyboard = [ [ InlineKeyboardButton(_('Обновить существующие замены'), callback_data='01')] ]
     # reply_markup = InlineKeyboardMarkup(keyboard)
     # text = (
@@ -278,8 +271,7 @@ async def document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not value_in_dict('dispatcher', context.user_data, 1):
         return
     if context.user_data['state'][0] in [1, 2]:
-        # _ = get_translator(update.effective_user.language_code)
-        _ = str
+        _ = get_translator(update.effective_user.language_code)
         _document = update.message.document
         logs.message(f'User {update.effective_user.id} has uploaded file "{_document.file_name}"')
         file_type = _document.file_name.split('.')[-1]
@@ -330,8 +322,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await query.answer()
     if not isinstance(data, str) or len(data) < 2:
         return
-    # _ = get_translator(update.effective_user.language_code)
-    _ = str
+    _ = get_translator(update.effective_user.language_code)
     text = query.message.text
     if data[0] == '0':
         text = _(
@@ -350,12 +341,11 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def enable_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Enable bot for non-admin users by adding main handlers
-    Включить бота для не-администаторов, добавив основные обработчики комманд
+    Включить бот для не-администраторов, добавив основные обработчики команд
     '''
     if not value_in_dict('admin', context.user_data, 1):
         return
-    # _ = get_translator(update.effective_user.language_code)
-    _ = str
+    _ = get_translator(update.effective_user.language_code)
     global bot_running
     if bot_running:
         reply_markup = ReplyKeyboardMarkup(user_keyboard(context.user_data), resize_keyboard=True)
@@ -372,12 +362,11 @@ async def enable_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 async def disable_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     Disable bot for non-admin users by removing main handlers
-    Выключить бота для не-адмнинстраторов, убрав основные обработчики комманд
+    Выключить бот для не-администраторов, убрав основные обработчики команд
     '''
     if not value_in_dict('admin', context.user_data, 1):
         return
-    # _ = get_translator(update.effective_user.language_code)
-    _ = str
+    _ = get_translator(update.effective_user.language_code)
     global bot_running
     if not bot_running:
         reply_markup = ReplyKeyboardMarkup(user_keyboard(context.user_data), resize_keyboard=True)
@@ -418,7 +407,7 @@ if __name__ == '__main__':
     }
     # Handlers for admin users and other handlers that should always be active
     # (like start handler)
-    permantent_handlers = {
+    permanent_handlers = {
         -1: [
             CommandHandler('start', start), CommandHandler('help', help_command),
             CommandHandler('reset', reset),
@@ -444,6 +433,6 @@ if __name__ == '__main__':
     persistence = PicklePersistence(filepath='bot_data')
     application = (Application.builder().token(token).
         persistence(persistence).post_init(post_init).build())
-    application.add_handlers(main_handlers | permantent_handlers)
+    application.add_handlers(main_handlers | permanent_handlers)
     bot_running = True
     application.run_polling()
