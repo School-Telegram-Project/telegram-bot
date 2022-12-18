@@ -20,11 +20,13 @@ from constants.files import *
 from replacements import Replacement
 from utils import add_value
 
+logger = logs.logger('Files')
 
-def find_user(telegram_id: int, phone_num = '') -> tuple:
+def find_user(telegram_id = 0, phone_num = '', name = '') -> tuple:
     '''
-    Finds user in database by phone number or Telegram ID
-    Находит пользователя в базе данных по номеру телефона или ID Telegram'а
+    Finds user in database
+    
+    Найди пользователя в базе данных
     '''
     try:
         with sqlite3.connect('database') as connection:
@@ -32,83 +34,115 @@ def find_user(telegram_id: int, phone_num = '') -> tuple:
 
             # Find user by ID
             # Найти пользователя по ID
-            query = (
-                 'SELECT DISTINCT\n'
-                 '\tname,\n'
-                 '\treplacer,\n'
-                 '\tdispatcher,\n'
-                #  '\tscheduler,\n'
-                 '\tadmin\n'
-                 'FROM staff\n'
-                f'WHERE telegram_id = {telegram_id};'
-            )
-            cursor.execute(query)
-            data = cursor.fetchall()
-            if data:
-                return tuple(zip(USER_DATATYPES, data[0]))
-
+            if telegram_id > 0:
+                cursor.execute(
+                     'SELECT DISTINCT\n'
+                     '\tname,\n'
+                     '\treplacer,\n'
+                     '\tdispatcher,\n'
+                     #  '\tscheduler,\n'
+                     '\tadmin\n'
+                     'FROM staff\n'
+                    f'WHERE telegram_id = ?;',
+                    [telegram_id]
+                )
+                data = cursor.fetchall()
+                if data:
+                    return tuple(zip(USER_DATATYPES, data[0]))
 
             # Find user by phone
             # Найти пользователя по номеру телефона
-            if phone_num == '':
-                return None
-
-            phone_num = int(phone_num)
-            query = (
-                 'SELECT DISTINCT\n'
-                 '\tname,\n'
-                 '\treplacer,\n'
-                 '\tdispatcher,\n'
-                #  '\tscheduler,\n'
-                 '\tadmin,\n'
-                 '\ttelegram_id\n'
-                 'FROM staff\n'
-                f'WHERE phone_num = {phone_num};'
-            )
-            cursor.execute(query)
-            data = cursor.fetchall()
-            if not data:
-                return None
-            if data[0][-1] in (None, NULL):
-                query = (
-                     'UPDATE staff\n'
-                    f'SET telegram_id = {telegram_id}\n'
-                    f'WHERE phone_num = {phone_num};'
+            if phone_num != '':
+                phone_num = int(phone_num)
+                cursor.execute(
+                     'SELECT DISTINCT\n'
+                     '\tname,\n'
+                     '\treplacer,\n'
+                     '\tdispatcher,\n'
+                     #  '\tscheduler,\n'
+                     '\tadmin,\n'
+                     '\ttelegram_id\n'
+                     'FROM staff\n'
+                    f'WHERE phone_num = ?;',
+                    [phone_num]
                 )
-                cursor.execute(query)
-                cursor.fetchall()
-            return tuple(zip(USER_DATATYPES, data[0][:-1]))
+                data = cursor.fetchall()
+                if not data:
+                    return None
+                if data[0][-1] in (None, NULL):
+                    query = (
+                        'UPDATE staff\n'
+                        f'SET telegram_id = {telegram_id}\n'
+                        f'WHERE phone_num = {phone_num};'
+                    )
+                    cursor.execute(query)
+                    cursor.fetchall()
+                return tuple(zip((*USER_DATATYPES, 'tg_id'), data[0]))
+
+            # Find user by name (returns Telegram ID)
+            # Найти пользователя по имени (возвращает Telegram ID)
+            if name == '':
+                return None
+            cursor.execute(
+                 'SELECT phone_num, telegram_id\n'
+                 'FROM staff\n'
+                f'WHERE name = ?;',
+                [name]
+            )
+            return cursor.fetchall()
+
     except sqlite3.Error as sql_error:
-        logs.message(f'Error occurred while searching for user {telegram_id}: {sql_error}')
+        logger.exception(f'Error occurred while searching for user {telegram_id}')
+        return None
 
-# def add_user(data: tuple) -> int:
-#     '''
-#     Adds new user to table in database
-#     Returns success (1 = added, 0 = already in DB, -1 = error)
-#     Добавляет нового пользователя в таблицу в базе данных
-#     Возвращает результат (1 = добавлен, 0 = уже в базе, -1 = ошибка)
-#     '''
-#     if len(data) < 8:
-#         return -1
-#     try:
-#         with sqlite3.connect('data') as connection:
-#             cursor = connection.cursor()
-#             query = (
-#                  'INSERT OR IGNORE INTO staff '
-#                  '(phone_num, telegram_id, name, full_name, replacer, scheduler, dispatcher, admin)\n'
-#                  'VALUES\n'
-#                 # f'\t({",".join([str(value) for value in data])});'
-#                 f'\t({",".join([str(value) for value in data]) + ",0"});'
-#             )
-#             cursor.execute(query)
-#             row = cursor.fetchall()
-#             return bool(row)
-#     except sqlite3.Error as sql_error:
-#         logs.message(f'Error occurred while adding user to database: {sql_error}')
-#         return -1
+def add_user(data: dict) -> int:
+    '''
+    Add new user
+    Returns:
+    - 1: success
+    - 0: user already in database
+    - -1: error
 
-# def save_replacements(file: str, mode = 0) -> int:
+    Добавить нового пользователя
+    Возвращает:
+    - 1: успех
+    - 0: пользователь есть в базе данных
+    - -1: ошибка
+    '''
+    try:
+        with sqlite3.connect('database') as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                'INSERT OR IGNORE INTO staff '
+                '(phone_num, name, replacer, scheduler, dispatcher, admin)\n'
+                'VALUES (:phone, :name, :replacer, 0, :dispatcher, :admin)',
+                data
+            )
+            return cursor.rowcount
+    except sqlite3.Error as sql_error:
+        logger.exception(f'Error occurred while searching for user {telegram_id}')
+        return -1
 
+def delete_user(phone_number = 0) -> bool:
+    '''
+    Delete user, returns True if successful
+
+    Удалить пользователя, возвращает True при успехе
+    '''
+    if phone_number == 0:
+        return False
+    try:
+        with sqlite3.connect('database') as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                'DELETE FROM staff\n'
+                'WHERE phone_num = ?',
+                [phone_number]
+            )
+        return bool(cursor.rowcount)
+    except sqlite3.Error as sql_error:
+        logger.exception(f'Error occurred while removing user with phone number {phone_number}')
+        return False
 
 def iter_block_items(parent) -> object:
     """
@@ -135,7 +169,8 @@ def iter_block_items(parent) -> object:
 def teacher_parse(text: str) -> tuple:
     '''
     Parse teacher field to format 'Aaa A A' and additional info
-    Приводит поле "учитель" к формату 'Aaa A A' и дополнительной информации
+    
+    Привести поле "учитель" к формату 'Aaa A A' и дополнительной информации
     '''
     groups = 0
     teacher = re.match(TEACHER_PATTERN, text)
@@ -175,7 +210,8 @@ def teacher_parse(text: str) -> tuple:
 def replacements_from_file(file_path: str) -> tuple:
     '''
     Extracts data from replacements document
-    Извлекает данные из файла замен
+    
+    Извлечь данные из файла замен
     '''
     document = Document(file_path)
     replaced_teacher = ''
@@ -236,10 +272,12 @@ def replacements_from_file(file_path: str) -> tuple:
 
     return replacements
 
+
 def replacements_generator(data: dict) -> Generator:
     '''
-    Returns generator of 1-dimensional array from dictionary {date: replacements}
-    Возвращает генератор 1-мерного массива из словаря {дата: замены}
+    Generator of 1-dimensional array from dictionary {date: replacements}
+    
+    Генератор 1-мерного массива из словаря {дата: замены}
     '''
     for _, teacher in enumerate(data):
         for __, repl in enumerate(data[teacher]):
@@ -258,13 +296,14 @@ def save_replacement(data: list) -> int:
     '''
     Save replacements data to database
     Returns amount of affected rows
+    
     Сохранение замен в базе данных
     Возвращает количество изменённых строк
     '''
     try:
         with sqlite3.connect('database') as connection:
             cursor = connection.cursor()
-            query = (
+            cursor.executescript(
                 "BEGIN;\n"
                 "CREATE TABLE IF NOT EXISTS replacements (\n"
                 "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
@@ -280,7 +319,6 @@ def save_replacement(data: list) -> int:
                 "DELETE FROM sqlite_sequence WHERE name='replacements';\n"
                 "COMMIT;"
             )
-            cursor.executescript(query)
 
             # if mode == 0:
 
@@ -295,12 +333,13 @@ def save_replacement(data: list) -> int:
             connection.commit()
             return cursor.rowcount
     except sqlite3.Error as error:
-        logs.message(f'Can not save data to database: {error}', 2)
+        logger.exception('Could not save replacements to database')
         return -1
 
 def read_replacements(teacher: str) -> list:
     '''
     Reads data from replacements
+    
     Чтение данных из базы замен
     '''
     try:
@@ -316,5 +355,5 @@ def read_replacements(teacher: str) -> list:
             rows = cursor.fetchall()
         return rows
     except sqlite3.Error as error:
-        logs.message(f'Can not read database: {error}', 2)
+        logger.exception(f'Could not load replacements for {teacher}')
         return None

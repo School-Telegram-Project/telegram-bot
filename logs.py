@@ -8,15 +8,25 @@ import logging
 from pathlib import Path
 import sys
 
-def setup(logs_path='') -> None:
+__all__ = (
+    'setup',
+    'logger'
+)
+
+def setup(logs_path='', debug = False) -> logging.Logger:
     '''
     Logging setup
+    If logs_path is empty string, logs are written to console
+    By default INFO is minimal level, if debug is True then DEBUG is also saved
+    
     Настройка логирования
+    Если logs_path - пустая строка, лог пишется в консоль
+    По умолчанию минимальный уровень логирования - INFO, если debug равен True, DEBUG также сохраняется
     '''
     if logs_path == '' and sys.stdout.isatty():
         logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',
                             datefmt='%H:%M:%S',
-                            level=logging.INFO)
+                            level=logging.DEBUG if debug else logging.INFO)
         return
 
     today = datetime.now()
@@ -35,13 +45,7 @@ def setup(logs_path='') -> None:
                         filemode='a',
                         format='%(asctime)s,%(msecs)d,%(levelname)s,%(message)s',
                         datefmt='%H:%M:%S',
-                        level=logging.INFO)
+                        level=logging.DEBUG if debug else logging.INFO)
 
-def message(text: str, level=0) -> None:
-    '''
-    Send message to logs
-    Отправить сообщение в логи
-    level: 0 - INFO, 1 - WARNING, 2 - ERROR, 3 - CRITICAL
-    '''
-    log_level = [logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL][level]
-    logging.log(log_level, text)
+def logger(module_name) -> logging.Logger:
+    return logging.getLogger(module_name)
