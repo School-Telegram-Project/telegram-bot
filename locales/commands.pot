@@ -1,0 +1,86 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-12-20 13:39+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: constants/main.py:41
+msgid "Да"
+msgstr ""
+
+#: constants/main.py:44
+msgid "Нет"
+msgstr ""
+
+#: constants/main.py:52
+msgid "Посмотреть мои замены"
+msgstr ""
+
+#: constants/main.py:56
+msgid "Загрузить файл замен"
+msgstr ""
+
+#: constants/main.py:60
+msgid "Запустить бот"
+msgstr ""
+
+#: constants/main.py:63
+msgid "Выключить бот"
+msgstr ""
+
+#: constants/main.py:66
+msgid "Скачать последний лог-файл"
+msgstr ""
+
+#: constants/main.py:70
+msgid "Добавить нового пользователя"
+msgstr ""
+
+#: constants/main.py:73
+msgid "Изменить имя пользователя"
+msgstr ""
+
+#: constants/main.py:76
+msgid "Заменяющий"
+msgstr ""
+
+#: constants/main.py:79
+msgid "Диспетчер"
+msgstr ""
+
+#: constants/main.py:82
+msgid "Администратор"
+msgstr ""
+
+#: constants/main.py:86
+msgid "Удалить пользователя"
+msgstr ""
+
+#: constants/main.py:89
+msgid "Использовать имя"
+msgstr ""
+
+#: constants/main.py:92
+msgid "Использовать номер телефона"
+msgstr ""
+
+#: constants/main.py:96
+msgid "Сохранить"
+msgstr ""
+
+#: constants/main.py:99
+msgid "Отменить"
+msgstr ""

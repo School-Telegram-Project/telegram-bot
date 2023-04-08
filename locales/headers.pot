@@ -1,0 +1,90 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-12-20 13:40+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: constants/files.py:44
+msgid "заменяющий учитель"
+msgstr ""
+
+#: constants/files.py:47
+msgid "№ урока"
+msgstr ""
+
+#: constants/files.py:50
+msgid "класс"
+msgstr ""
+
+#: constants/files.py:53
+msgid "кабинет"
+msgstr ""
+
+#: constants/files.py:66
+# String is regular expression
+msgid ""
+"(?P<d>0?[1-9]|[12][0-9]|3[01])\\s*(?P<m>янв(?:аря)?|фев(?:раля)?|мар(?:та)?|"
+"апр(?:еля)?|ма(?:я)|июн(?:я)?|июл(?:я)?|авг(?:уста)?|сен(?:тября)?|окт(?:"
+"ября)?|ноя(?:бря)?|дек(?:абря)?)\\s*(?P<y>[0-9]+)"
+msgstr ""
+
+#: constants/files.py:76
+msgid "янв"
+msgstr ""
+
+#: constants/files.py:76
+msgid "фев"
+msgstr ""
+
+#: constants/files.py:77
+msgid "мар"
+msgstr ""
+
+#: constants/files.py:77
+msgid "апр"
+msgstr ""
+
+#: constants/files.py:77
+msgid "ма"
+msgstr ""
+
+#: constants/files.py:78
+msgid "июн"
+msgstr ""
+
+#: constants/files.py:78
+msgid "июл"
+msgstr ""
+
+#: constants/files.py:78
+msgid "авг"
+msgstr ""
+
+#: constants/files.py:79
+msgid "сен"
+msgstr ""
+
+#: constants/files.py:79
+msgid "окт"
+msgstr ""
+
+#: constants/files.py:79
+msgid "ноя"
+msgstr ""
+
+#: constants/files.py:80
+msgid "дек"
+msgstr ""

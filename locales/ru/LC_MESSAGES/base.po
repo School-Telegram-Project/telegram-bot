@@ -1,0 +1,141 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-12-10 20:09+0300\n"
+"PO-Revision-Date: 2022-12-20 13:42+0300\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2);\n"
+"X-Generator: Poedit 3.0.1\n"
+
+# Starting message
+#: main.py:114
+msgid ""
+"<b>Здравствуйте!</b>\n"
+"Я школьный чат-бот, созданный для отправки информации, которая касается "
+"только Вас. Вы можете узнать о своих заменах моей помощью. Но перед работой "
+"мне нужно получить Ваш номер, чтобы занести его в базу данных, пожалуйста, "
+"подтвердите это действие, нажав на кнопку <i>Отправить номер</i> ниже."
+msgstr ""
+"<b>Здравствуйте!</b>\n"
+"Я школьный чат-бот, созданный для отправки информации, которая касается "
+"только Вас. Вы можете узнать о своих заменах моей помощью. Но перед работой "
+"мне нужно получить Ваш номер, чтобы занести его в базу данных, пожалуйста, "
+"подтвердите это действие, нажав на кнопку <i>Отправить номер</i> ниже."
+
+# Select action via button
+#: main.py:127
+msgid "Выберите действие с помощью кнопок..."
+msgstr "Выберите действие с помощью кнопок..."
+
+# Help menu
+#: main.py:137
+msgid ""
+"Используйте команду <i>/start</i> для начала работы с ботом.\n"
+"Используйте клавиатуру команд для выбора действия и следуйте инструкциям."
+msgstr ""
+"Используйте команду <i>/start</i> для начала работы с ботом.\n"
+"Используйте клавиатуру команд для выбора действия и следуйте инструкциям."
+
+# Somebody's else contact was sended
+#: main.py:164
+msgid "Пожалуйста, отправьте <b>свой</b> контакт."
+msgstr "Пожалуйста, отправьте <b>свой</b> контакт."
+
+# User data not found
+#: main.py:171
+msgid ""
+"Вы отсутствуете среди списка пользователей.\n"
+"Пожалуйста, обратитесь к администрации."
+msgstr ""
+"Вы отсутствуете среди списка пользователей.\n"
+"Пожалуйста, обратитесь к администрации."
+
+# User data found
+#: main.py:186
+msgid "Пользовательские данные сохранены."
+msgstr "Пользовательские данные сохранены."
+
+# Couldn't read database
+#: main.py:202
+msgid "Не удалось прочитать базу данных."
+msgstr "Не удалось прочитать базу данных."
+
+# No replacements found
+#: main.py:206
+msgid "Замены не найдены."
+msgstr "Замены не найдены."
+
+# Replacement for <class_name> class on <lesson>('th) lesson (+ extra information)
+#: main.py:214
+#, python-brace-format
+msgid "Замена у {class_name} класса на {lesson} уроке{room}{additional}"
+msgstr "Замена у {class_name} класса на {lesson} уроке{room}{additional}"
+
+# (Lesson is) in {0} room
+#: main.py:221
+#, python-brace-format
+msgid "в кабинете {0}"
+msgstr "в кабинете {0}"
+
+# Replacements for DD.MM.YYYY
+#: main.py:234
+#, python-brace-format
+msgid "Замены на {d}.{m}.{y}:"
+msgstr "Замены на {d}.{m}.{y}:"
+
+# Replacements file request
+#: main.py:268
+msgid "Пожалуйста, загрузите таблицу замен."
+msgstr "Пожалуйста, загрузите таблицу замен."
+
+# Currently working
+#: main.py:292
+msgid "Идёт обработка файла, пожалуйста, подождите..."
+msgstr "Идёт обработка файла, пожалуйста, подождите..."
+
+# New replacements
+#: main.py:298
+msgid "! <b>У вас есть новые замены</b> !"
+msgstr "! <b>У вас есть новые замены</b> !"
+
+# Error occurred while saving data
+#: main.py:312
+msgid "Возникла проблема с сохранением данных, "
+msgstr "Возникла проблема с сохранением данных, "
+
+# Data successfully saved
+#: main.py:315
+msgid "Данные сохранены."
+msgstr "Данные сохранены."
+
+# Bot is already running
+#: main.py:362
+msgid "Бот уже запущен."
+msgstr "Бот уже запущен."
+
+# Bot was successfully launched
+#: main.py:368
+msgid "Бот успешно запущен."
+msgstr "Бот успешно запущен."
+
+# Bot is already stopped
+#: main.py:385
+msgid "Бот уже выключен."
+msgstr "Бот уже выключен."
+
+# Bot was successfully stopped
+#: main.py:392
+msgid "Бот успешно выключен."
+msgstr "Бот успешно выключен."

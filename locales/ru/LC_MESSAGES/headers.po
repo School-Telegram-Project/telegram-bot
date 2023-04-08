@@ -1,0 +1,117 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: "
+"2022-12-20 13:40+0300\n"
+"PO-Revision-Date: "
+"2022-12-20 13:43+0300\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/"
+"plain; charset=UTF-8\n"
+"Content-Transfer-"
+"Encoding: 8bit\n"
+"Plural-Forms: "
+"nplurals=3; "
+"plural=(n%10==1 && "
+"n%100!=11 ? 0 : n%10>=2 "
+"&& n%10<=4 && (n%100<12 "
+"|| n%100>14) ? 1 : 2);\n"
+"X-Generator: Poedit "
+"3.0.1\n"
+
+#: constants/files.py:44
+msgid "заменяющий учитель"
+msgstr ""
+"заменяющий учитель"
+
+#: constants/files.py:47
+msgid "№ урока"
+msgstr "№ урока"
+
+#: constants/files.py:50
+msgid "класс"
+msgstr "класс"
+
+#: constants/files.py:53
+msgid "кабинет"
+msgstr "кабинет"
+
+# String is regular expression
+#: constants/files.py:66
+msgid ""
+"(?P<d>0?[1-9]|[12][0-9]|"
+"3[01])\\s*(?P<m>янв(?:"
+"аря)?|фев(?:раля)?|"
+"мар(?:та)?|апр(?:еля)?|"
+"ма(?:я)|июн(?:я)?|июл(?:"
+"я)?|авг(?:уста)?|сен(?:"
+"тября)?|окт(?:ября)?|"
+"ноя(?:бря)?|дек(?:"
+"абря)?)\\s*(?P<y>[0-9]+)"
+msgstr ""
+"(?P<d>0?[1-9]|[12][0-9]|"
+"3[01])\\s*(?P<m>янв(?:"
+"аря)?|фев(?:раля)?|"
+"мар(?:та)?|апр(?:еля)?|"
+"ма(?:я)|июн(?:я)?|июл(?:"
+"я)?|авг(?:уста)?|сен(?:"
+"тября)?|окт(?:ября)?|"
+"ноя(?:бря)?|дек(?:"
+"абря)?)\\s*(?P<y>[0-9]+)"
+
+#: constants/files.py:76
+msgid "янв"
+msgstr "янв"
+
+#: constants/files.py:76
+msgid "фев"
+msgstr "фев"
+
+#: constants/files.py:77
+msgid "мар"
+msgstr "мар"
+
+#: constants/files.py:77
+msgid "апр"
+msgstr "апр"
+
+#: constants/files.py:77
+msgid "ма"
+msgstr "ма"
+
+#: constants/files.py:78
+msgid "июн"
+msgstr "июн"
+
+#: constants/files.py:78
+msgid "июл"
+msgstr "июл"
+
+#: constants/files.py:78
+msgid "авг"
+msgstr "авг"
+
+#: constants/files.py:79
+msgid "сен"
+msgstr "сен"
+
+#: constants/files.py:79
+msgid "окт"
+msgstr "окт"
+
+#: constants/files.py:79
+msgid "ноя"
+msgstr "ноя"
+
+#: constants/files.py:80
+msgid "дек"
+msgstr "дек"
