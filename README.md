@@ -16,15 +16,6 @@
     * Библиотека Docx (python-docx)
 * 50+ Гб места
 
----
-# Поддержка
-## Перевод
-
-Локализация в программе осуществлена с помощью [gettext](https://www.gnu.org/software/gettext/manual/html_node/index.html "Официальная документация (англ.)"). Если вы хотите добавить свою локализацию, создайте ветвь, опубликуйте перевод в
-> locales/&lt;language>/LC_MESSAGES/base.po
-
-и
-
-> locales/&lt;language>/LC_MESSAGES/base.mo
-
-После этого откройте запрос с меткой __localization__.
+Скрипт развёрстки (дополнительно к основным требованиям):
+* git
+* Библиотека GitPython
